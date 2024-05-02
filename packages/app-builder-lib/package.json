@@ -58,7 +58,7 @@
     "builder-util-runtime": "workspace:*",
     "chromium-pickle-js": "^0.2.0",
     "debug": "^4.3.4",
-    "ejs": "^3.1.8",
+    "ejs": "^3.1.10",
     "electron-publish": "workspace:*",
     "form-data": "^4.0.0",
     "fs-extra": "^10.1.0",
@@ -71,7 +71,7 @@
     "read-config-file": "6.3.2",
     "sanitize-filename": "^1.6.3",
     "semver": "^7.3.8",
-    "tar": "^6.1.12",
+    "tar": "^6.2.1",
     "temp-file": "^3.4.0"
   },
   "///": "babel in devDependencies for proton tests",
