@@ -60,7 +60,7 @@
     "lazy-val": "^1.0.5",
     "read-config-file": "6.3.2",
     "simple-update-notifier": "2.0.0",
-    "yargs": "^17.6.2"
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/fs-extra": "9.0.13",
