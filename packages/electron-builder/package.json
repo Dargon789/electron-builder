@@ -63,7 +63,7 @@
     "yargs": "^17.6.2"
   },
   "devDependencies": {
-    "@types/fs-extra": "9.0.13",
+    "@types/fs-extra": "11.0.4",
     "@types/is-ci": "3.0.0",
     "@types/yargs": "^17.0.16"
   },
