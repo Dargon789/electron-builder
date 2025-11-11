@@ -1,11 +1,12 @@
 import { AllPublishOptions } from "builder-util-runtime"
 import { AppAdapter } from "./AppAdapter"
 import { DownloadUpdateOptions } from "./AppUpdater"
-import { BaseUpdater, InstallOptions } from "./BaseUpdater"
-import { DOWNLOAD_PROGRESS } from "./main"
+import { InstallOptions } from "./BaseUpdater"
+import { DOWNLOAD_PROGRESS, Logger } from "./types"
 import { findFile } from "./providers/Provider"
+import { LinuxUpdater } from "./LinuxUpdater"
 
-export class RpmUpdater extends BaseUpdater {
+export class RpmUpdater extends LinuxUpdater {
   constructor(options?: AllPublishOptions | null, app?: AppAdapter) {
     super(options, app)
   }
@@ -13,7 +14,7 @@ export class RpmUpdater extends BaseUpdater {
   /*** @private */
   protected doDownloadUpdate(downloadUpdateOptions: DownloadUpdateOptions): Promise<Array<string>> {
     const provider = downloadUpdateOptions.updateInfoAndProvider.provider
-    const fileInfo = findFile(provider.resolveFiles(downloadUpdateOptions.updateInfoAndProvider.info), "rpm", ["AppImage", "deb"])!
+    const fileInfo = findFile(provider.resolveFiles(downloadUpdateOptions.updateInfoAndProvider.info), "rpm", ["AppImage", "deb", "pacman"])!
     return this.executeDownload({
       fileExtension: "rpm",
       fileInfo,
@@ -28,39 +29,40 @@ export class RpmUpdater extends BaseUpdater {
   }
 
   protected doInstall(options: InstallOptions): boolean {
-    const upgradePath = options.installerPath
-    const sudo = this.wrapSudo()
-    // pkexec doesn't want the command to be wrapped in " quotes
-    const wrapper = /pkexec/i.test(sudo) ? "" : `"`
-    const packageManager = this.spawnSyncLog("which zypper")
-    let cmd: string[]
-    if (!packageManager) {
-      const packageManager = this.spawnSyncLog("which dnf || which yum")
-      cmd = [packageManager, "-y", "remove", `'${this.app.name}'`, ";", packageManager, "-y", "install", upgradePath]
-    } else {
-      cmd = [
-        packageManager,
-        "remove",
-        "-y",
-        `'${this.app.name}'`,
-        ";",
-        packageManager,
-        "clean",
-        "--all",
-        ";",
-        packageManager,
-        "--no-refresh",
-        "install",
-        "--allow-unsigned-rpm",
-        "-y",
-        "-f",
-        upgradePath,
-      ]
+    const installerPath = this.installerPath
+    if (installerPath == null) {
+      this.dispatchError(new Error("No update filepath provided, can't quit and install"))
+      return false
     }
-    this.spawnSyncLog(sudo, [`${wrapper}/bin/bash`, "-c", `'${cmd.join(" ")}'${wrapper}`])
+
+    const priorityList = ["zypper", "dnf", "yum", "rpm"]
+    const packageManager = this.detectPackageManager(priorityList)
+    try {
+      RpmUpdater.installWithCommandRunner(packageManager as any, installerPath, this.runCommandWithSudoIfNeeded.bind(this), this._logger)
+    } catch (error: any) {
+      this.dispatchError(error)
+      return false
+    }
     if (options.isForceRunAfter) {
       this.app.relaunch()
     }
     return true
+  }
+
+  static installWithCommandRunner(packageManager: "zypper" | "dnf" | "yum" | "rpm", installerPath: string, commandRunner: (commandWithArgs: string[]) => void, logger: Logger) {
+    if (packageManager === "zypper") {
+      return commandRunner(["zypper", "--non-interactive", "--no-refresh", "install", "--allow-unsigned-rpm", "-f", installerPath])
+    }
+    if (packageManager === "dnf") {
+      return commandRunner(["dnf", "install", "--nogpgcheck", "-y", installerPath])
+    }
+    if (packageManager === "yum") {
+      return commandRunner(["yum", "install", "--nogpgcheck", "-y", installerPath])
+    }
+    if (packageManager === "rpm") {
+      logger.warn("Installing with rpm only (no dependency resolution).")
+      return commandRunner(["rpm", "-Uvh", "--replacepkgs", "--replacefiles", "--nodeps", installerPath])
+    }
+    throw new Error(`Package manager ${packageManager} not supported`)
   }
 }

@@ -15,7 +15,10 @@ export default class MsiWrappedTarget extends MsiTarget {
   /** @private */
   private readonly archs: Map<Arch, string> = new Map()
 
-  constructor(packager: WinPackager, readonly outDir: string) {
+  constructor(
+    packager: WinPackager,
+    readonly outDir: string
+  ) {
     // must be synchronous so it can run after nsis
     super(packager, outDir, "msiWrapped", false)
   }
@@ -55,11 +58,12 @@ export default class MsiWrappedTarget extends MsiTarget {
     return Promise.resolve()
   }
 
-  finishBuild(): Promise<any> {
+  async finishBuild(): Promise<any> {
+    await super.finishBuild()
     // this target invokes `build` in `finishBuild` to guarantee
     // that the dependent target has already been built
     // this also affords us re-usability
-    const [arch, appOutDir] = this.archs.entries().next().value
+    const [arch, appOutDir] = this.archs.entries().next().value!
 
     this.validatePrerequisites()
 

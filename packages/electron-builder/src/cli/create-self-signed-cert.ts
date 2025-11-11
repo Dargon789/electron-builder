@@ -1,8 +1,7 @@
-import { sanitizeFileName } from "app-builder-lib/out/util/filename"
-import { exec, log, spawn, TmpDir } from "builder-util"
-import { unlinkIfExists } from "builder-util/out/fs"
+import { getSignVendorPath } from "app-builder-lib/out/codeSign/windowsSignToolManager"
+import { exec, log, spawn, TmpDir, unlinkIfExists } from "builder-util"
+import { sanitizeFileName } from "builder-util/out/filename"
 import * as chalk from "chalk"
-import { getSignVendorPath } from "app-builder-lib/out/codeSign/windowsCodeSign"
 import { mkdir } from "fs/promises"
 import * as path from "path"
 
@@ -27,7 +26,7 @@ export async function createSelfSignedCert(publisher: string) {
     log.info({ file: pfx }, `created. Please see https://electron.build/code-signing how to use it to sign.`)
 
     const certLocation = "Cert:\\LocalMachine\\TrustedPeople"
-    log.info({ file: pfx, certLocation }, `importing. Operation will be succeed only if runned from root. Otherwise import file manually.`)
+    log.info({ file: pfx, certLocation }, `importing. Operation will be succeed only if runned from root. Otherwise import  file manually.`)
     await spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Import-PfxCertificate", "-FilePath", `"${pfx}"`, "-CertStoreLocation", certLocation])
   } finally {
     await tmpDir.cleanup()

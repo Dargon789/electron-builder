@@ -1,9 +1,9 @@
 import * as sax from "sax"
-import { newError } from "./index"
+import { newError } from "./error"
 
 export class XElement {
   value = ""
-  attributes: { [key: string]: string } | null = null
+  attributes: Record<string, string> | null = null
   isCData = false
   elements: Array<XElement> | null = null
 
@@ -83,7 +83,7 @@ export function parseXml(data: string): XElement {
 
   parser.onopentag = saxElement => {
     const element = new XElement(saxElement.name)
-    element.attributes = saxElement.attributes as { [key: string]: string }
+    element.attributes = saxElement.attributes as Record<string, string>
 
     if (rootElement === null) {
       rootElement = element

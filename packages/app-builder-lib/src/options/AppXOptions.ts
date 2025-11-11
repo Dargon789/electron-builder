@@ -2,7 +2,7 @@ import { TargetSpecificOptions } from "../core"
 
 export interface AppXOptions extends TargetSpecificOptions {
   /**
-   * The application id. Defaults to `identityName`. Can’t start with numbers.
+   * The application id. Defaults to `identityName`. This string contains alpha-numeric fields separated by periods. Each field must begin with an ASCII alphabetic character.
    */
   readonly applicationId?: string
 
@@ -19,7 +19,7 @@ export interface AppXOptions extends TargetSpecificOptions {
   readonly displayName?: string | null
 
   /**
-   * The name. Corresponds to [Identity.Name](https://msdn.microsoft.com/en-us/library/windows/apps/br211441.aspx). Defaults to the [application name](/configuration/configuration#Metadata-name).
+   * The name. Corresponds to [Identity.Name](https://msdn.microsoft.com/en-us/library/windows/apps/br211441.aspx). Defaults to the [application name](./configuration.md#metadata).
    */
   readonly identityName?: string | null
 
@@ -52,6 +52,33 @@ export interface AppXOptions extends TargetSpecificOptions {
   readonly customExtensionsPath?: string
 
   /**
+   * (Advanced Option) Relative path to custom `appmanifest.xml` (file name doesn't matter, it'll be renamed) located in build resources directory.
+   * Supports the following template macros:
+   *
+   * - ${publisher}
+   * - ${publisherDisplayName}
+   * - ${version}
+   * - ${applicationId}
+   * - ${identityName}
+   * - ${executable}
+   * - ${displayName}
+   * - ${description}
+   * - ${backgroundColor}
+   * - ${logo}
+   * - ${square150x150Logo}
+   * - ${square44x44Logo}
+   * - ${lockScreen}
+   * - ${defaultTile}
+   * - ${splashScreen}
+   * - ${arch}
+   * - ${resourceLanguages}
+   * - ${extensions}
+   * - ${minVersion}
+   * - ${maxVersionTested}
+   */
+  readonly customManifestPath?: string
+
+  /**
    * Whether to overlay the app's name on top of tile images on the Start screen. Defaults to `false`. (https://docs.microsoft.com/en-us/uwp/schemas/appxpackage/uapmanifestschema/element-uap-shownameontiles) in the dependencies.
    * @default false
    */
@@ -68,6 +95,18 @@ export interface AppXOptions extends TargetSpecificOptions {
    * @default false
    */
   readonly setBuildNumber?: boolean
+
+  /**
+   * Set the MinVersion field in the appx manifest.xml
+   * @default arch === Arch.arm64 ? "10.0.16299.0" : "10.0.14316.0"
+   */
+  readonly minVersion?: string | null
+
+  /**
+   * Set the `MaxVersionTested` field in the appx manifest.xml
+   * @default arch === Arch.arm64 ? "10.0.16299.0" : "10.0.14316.0"
+   */
+  readonly maxVersionTested?: string | null
 
   /** @private */
   readonly makeappxArgs?: Array<string> | null

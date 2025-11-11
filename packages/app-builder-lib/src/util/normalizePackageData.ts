@@ -1,5 +1,5 @@
-import * as semver from "semver"
 import { fromUrl } from "hosted-git-info"
+import * as semver from "semver"
 import * as url from "url"
 
 export function normalizePackageData(data: any) {
@@ -298,13 +298,13 @@ function depObjectify(deps: any): any {
     .filter(function (d) {
       return typeof d === "string"
     })
-    .forEach(function (d) {
-      d = d.trim().split(/(:?[@\s><=])/)
-      const dn = d.shift()
-      let dv = d.join("")
+    .forEach(function (d: string) {
+      const arr: string[] = d.trim().split(/(:?[@\s><=])/)
+      const dn = arr.shift()
+      let dv = arr.join("")
       dv = dv.trim()
       dv = dv.replace(/^@/, "")
-      o[dn] = dv
+      o[dn!] = dv
     })
   return o
 }

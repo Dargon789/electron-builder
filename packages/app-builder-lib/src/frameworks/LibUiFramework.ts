@@ -1,13 +1,13 @@
-import { emptyDir } from "fs-extra"
-import { mkdir, chmod, rename, writeFile } from "fs/promises"
-import * as path from "path"
 import { executeAppBuilder } from "builder-util"
+import { emptyDir } from "fs-extra"
+import { chmod, mkdir, rename, writeFile } from "fs/promises"
+import * as path from "path"
 import { AfterPackContext } from "../configuration"
 import { Platform } from "../core"
 import { Framework, PrepareApplicationStageDirectoryOptions } from "../Framework"
 import { LinuxPackager } from "../linuxPackager"
-import MacPackager from "../macPackager"
-import { executeAppBuilderAndWriteJson } from "../util/appBuilder"
+import { MacPackager } from "../macPackager"
+import { savePlistFile } from "../util/plist"
 
 export class LibUiFramework implements Framework {
   readonly name: string = "libui"
@@ -22,7 +22,11 @@ export class LibUiFramework implements Framework {
   // noinspection JSUnusedGlobalSymbols
   readonly isNpmRebuildRequired = false
 
-  constructor(readonly version: string, readonly distMacOsAppName: string, protected readonly isUseLaunchUi: boolean) {}
+  constructor(
+    readonly version: string,
+    readonly distMacOsAppName: string,
+    protected readonly isUseLaunchUi: boolean
+  ) {}
 
   async prepareApplicationStageDirectory(options: PrepareApplicationStageDirectoryOptions) {
     await emptyDir(options.appOutDir)
@@ -67,16 +71,14 @@ export class LibUiFramework implements Framework {
       NSHighResolutionCapable: true,
     }
     await packager.applyCommonInfo(appPlist, appContentsDir)
-    await Promise.all([
-      executeAppBuilderAndWriteJson(["encode-plist"], { [path.join(appContentsDir, "Info.plist")]: appPlist }),
-      writeExecutableMain(
-        path.join(appContentsDir, "MacOS", appPlist.CFBundleExecutable),
-        `#!/bin/sh
+    await savePlistFile(path.join(appContentsDir, "Info.plist"), appPlist)
+    await writeExecutableMain(
+      path.join(appContentsDir, "MacOS", appPlist.CFBundleExecutable),
+      `#!/bin/sh
   DIR=$(dirname "$0")
   "$DIR/node" "$DIR/../Resources/app/${options.packager.info.metadata.main || "index.js"}"
   `
-      ),
-    ])
+    )
   }
 
   private async prepareLinuxApplicationStageDirectory(options: PrepareApplicationStageDirectoryOptions) {

@@ -1,7 +1,7 @@
-import { app, appThrows } from "../helpers/packTester"
 import { Platform } from "electron-builder"
 import { XMLParser } from "fast-xml-parser"
 import * as fs from "fs"
+import { app, appThrows } from "../helpers/packTester"
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -9,9 +9,9 @@ const parser = new XMLParser({
   parseTagValue: true,
 })
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped requires nsis",
+test.ifDevOrWinCi("msiWrapped requires nsis", ({ expect }) =>
   appThrows(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget("msiWrapped"),
       config: {
@@ -23,6 +23,16 @@ test.ifAll.ifDevOrWinCi(
         win: {
           target: ["msiWrapped"],
         },
+        electronFuses: {
+          runAsNode: true,
+          enableCookieEncryption: true,
+          enableNodeOptionsEnvironmentVariable: true,
+          enableNodeCliInspectArguments: true,
+          enableEmbeddedAsarIntegrityValidation: true,
+          onlyLoadAppFromAsar: true,
+          loadBrowserProcessSpecificV8Snapshot: true,
+          grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
+        },
       },
     },
     {},
@@ -33,9 +43,9 @@ test.ifAll.ifDevOrWinCi(
   )
 )
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped allows capitalized nsis target",
+test.ifDevOrWinCi("msiWrapped allows capitalized nsis target", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["msiWrapped", "NSIS"]),
       config: {
@@ -53,9 +63,8 @@ test.ifAll.ifDevOrWinCi(
   )
 )
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped includes packaged exe",
-  app({
+test.ifDevOrWinCi("msiWrapped includes packaged exe", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["msiWrapped", "nsis"]),
     config: {
       appId: "build.electron.test.msi.oneClick.perMachine",
@@ -78,9 +87,8 @@ test.ifAll.ifDevOrWinCi(
   })
 )
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped impersonate no if not provided",
-  app({
+test.ifDevOrWinCi("msiWrapped impersonate no if not provided", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["msiWrapped", "nsis"]),
     config: {
       appId: "build.electron.test.msi.oneClick.perMachine",
@@ -102,9 +110,8 @@ test.ifAll.ifDevOrWinCi(
   })
 )
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped impersonate yes if true",
-  app({
+test.ifDevOrWinCi("msiWrapped impersonate yes if true", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["msiWrapped", "nsis"]),
     config: {
       appId: "build.electron.test.msi.oneClick.perMachine",
@@ -129,9 +136,8 @@ test.ifAll.ifDevOrWinCi(
   })
 )
 
-test.ifAll.ifDevOrWinCi(
-  "msiWrapped wrappedInstallerArgs provided",
-  app({
+test.ifDevOrWinCi("msiWrapped wrappedInstallerArgs provided", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["msiWrapped", "nsis"]),
     config: {
       appId: "build.electron.test.msi.oneClick.perMachine",

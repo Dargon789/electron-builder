@@ -8,19 +8,21 @@ import pathSorter from "path-sort"
 import { assertThat } from "../helpers/fileAssert"
 import { app, copyTestAsset, createMacTargetTest, getFixtureDir, parseFileList } from "../helpers/packTester"
 
-test.ifMac.ifAll("invalid target", () => assertThat(createMacTargetTest(["ttt" as any])()).throws())
+test.ifMac("invalid target", ({ expect }) => expect(createMacTargetTest(expect, ["ttt" as any])).rejects.toThrow())
 
-test.ifNotWindows.ifAll("only zip", createMacTargetTest(["zip"], undefined, false /* no need to test sign */))
+test.ifNotWindows("only zip", ({ expect }) => createMacTargetTest(expect, ["zip"], undefined, false /* no need to test sign */))
 
-test.ifNotWindows.ifAll("tar.gz", createMacTargetTest(["tar.gz"]))
+test.ifNotWindows("tar.gz", ({ expect }) => createMacTargetTest(expect, ["tar.gz"]))
+
+// test.ifNotWindows("tar.xz", createTargetTest(["tar.xz"], ["Test App ßW-1.1.0-mac.tar.xz"]))
 
 const it = process.env.CSC_KEY_PASSWORD == null ? test.skip : test.ifMac
 
-it("pkg", createMacTargetTest(["pkg"]))
+it("pkg", ({ expect }) => createMacTargetTest(expect, ["pkg"]))
 
-test.ifAll.ifMac(
-  "empty installLocation",
+test.ifMac("empty installLocation", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.MAC.createTarget("pkg", Arch.x64),
       config: {
@@ -38,9 +40,9 @@ test.ifAll.ifMac(
   )
 )
 
-test.ifAll.ifMac(
-  "extraDistFiles",
+test.ifMac("extraDistFiles", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.MAC.createTarget("zip", Arch.x64),
       config: {
@@ -58,9 +60,9 @@ test.ifAll.ifMac(
   )
 )
 
-test.ifAll.ifMac(
-  "pkg extended configuration",
+test.ifMac("pkg extended configuration", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.MAC.createTarget("pkg", Arch.x64),
       config: {
@@ -106,9 +108,9 @@ test.ifAll.ifMac(
   )
 )
 
-test.ifAll.ifMac(
-  "pkg scripts",
+test.ifMac("pkg scripts", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.MAC.createTarget("pkg", Arch.x64),
     },
@@ -129,6 +131,7 @@ test.ifAll.ifMac(
         const info = parseXml(await fs.readFile(path.join(unpackedDir, "Distribution"), "utf8"))
         for (const element of info.getElements("pkg-ref")) {
           element.removeAttribute("installKBytes")
+          element.removeAttribute("updateKBytes")
           const bundleVersion = element.elementOrNull("bundle-version")
           if (bundleVersion != null) {
             bundleVersion.element("bundle").removeAttribute("CFBundleVersion")
@@ -141,11 +144,32 @@ test.ifAll.ifMac(
         expect(info).toMatchSnapshot()
 
         const scriptDir = path.join(unpackedDir, "org.electron-builder.testApp.pkg", "Scripts")
-        await Promise.all([assertThat(path.join(scriptDir, "postinstall")).isFile(), assertThat(path.join(scriptDir, "preinstall")).isFile()])
+        await assertThat(expect, path.join(scriptDir, "postinstall")).isFile()
+        await assertThat(expect, path.join(scriptDir, "preinstall")).isFile()
       },
     }
   )
 )
 
-// todo failed on Travis CI
-//test("tar.xz", createTargetTest(["tar.xz"], ["Test App ßW-1.1.0-mac.tar.xz"]))
+test.ifMac("pkg extra packages", async ({ expect }) => {
+  const extraPackages = path.join("build", "extra-packages")
+  return app(
+    expect,
+    {
+      targets: Platform.MAC.createTarget("pkg", Arch.x64),
+      config: {
+        pkg: {
+          extraPkgsDir: extraPackages,
+        },
+      },
+    },
+    {
+      signed: false,
+      projectDirCreated: async projectDir => {
+        const extraPackagesDir = path.join(projectDir, extraPackages)
+        await fs.mkdir(extraPackagesDir)
+        await fs.writeFile(path.join(extraPackagesDir, "noop.pkg"), "data")
+      },
+    }
+  )
+})

@@ -1,6 +1,5 @@
-import BluebirdPromise from "bluebird-lst"
-import { asArray, log } from "builder-util"
-import { copyDir, copyOrLinkFile, Filter, statOrNull, FileTransformer, USE_HARD_LINKS } from "builder-util/out/fs"
+import { asArray, copyDir, copyOrLinkFile, FileTransformer, Filter, log, statOrNull, USE_HARD_LINKS } from "builder-util"
+import { Nullish } from "builder-util-runtime"
 import { mkdir } from "fs/promises"
 import { Minimatch } from "minimatch"
 import * as path from "path"
@@ -16,13 +15,13 @@ export const excludedNames =
   ".git,.hg,.svn,CVS,RCS,SCCS," +
   "__pycache__,.DS_Store,thumbs.db,.gitignore,.gitkeep,.gitattributes,.npmignore," +
   ".idea,.vs,.flowconfig,.jshintrc,.eslintrc,.circleci," +
-  ".yarn-integrity,.yarn-metadata.json,yarn-error.log,yarn.lock,package-lock.json,npm-debug.log," +
+  ".yarn-integrity,.yarn-metadata.json,yarn-error.log,yarn.lock,package-lock.json,npm-debug.log,pnpm-lock.yaml," +
   "appveyor.yml,.travis.yml,circle.yml,.nyc_output,.husky,.github,electron-builder.env"
 
 export const excludedExts =
   "iml,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,suo,xproj,cc,d.ts," +
   // https://github.com/electron-userland/electron-builder/issues/7512
-  "mk,a,o,forge-meta"
+  "mk,a,o,obj,forge-meta"
 
 function ensureNoEndSlash(file: string): string {
   if (path.sep !== "/") {
@@ -39,7 +38,6 @@ function ensureNoEndSlash(file: string): string {
   }
 }
 
-/** @internal */
 export class FileMatcher {
   readonly from: string
   readonly to: string
@@ -50,7 +48,12 @@ export class FileMatcher {
 
   readonly isSpecifiedAsEmptyArray: boolean
 
-  constructor(from: string, to: string, readonly macroExpander: (pattern: string) => string, patterns?: Array<string> | string | null | undefined) {
+  constructor(
+    from: string,
+    to: string,
+    readonly macroExpander: (pattern: string) => string,
+    patterns?: Array<string> | string | null
+  ) {
     this.from = ensureNoEndSlash(macroExpander(from))
     this.to = ensureNoEndSlash(macroExpander(to))
     this.patterns = asArray(patterns).map(it => this.normalizePattern(it))
@@ -159,7 +162,19 @@ export function getMainFileMatchers(
     patterns.push("package.json")
   }
 
-  customFirstPatterns.push("!**/node_modules")
+  let insertExculdeNodeModulesIndex = -1
+  for (let i = 0; i < patterns.length; i++) {
+    if (!patterns[i].startsWith("!") && (patterns[i].includes("/node_modules") || patterns[i].includes("node_modules/"))) {
+      insertExculdeNodeModulesIndex = i
+      break
+    }
+  }
+
+  if (insertExculdeNodeModulesIndex !== -1) {
+    patterns.splice(insertExculdeNodeModulesIndex, 0, ...["!**/node_modules/**"])
+  } else {
+    customFirstPatterns.push("!**/node_modules/**")
+  }
 
   // https://github.com/electron-userland/electron-builder/issues/1482
   const relativeBuildResourceDir = path.relative(matcher.from, buildResourceDir)
@@ -217,7 +232,7 @@ export function getNodeModuleFileMatcher(
   // grab only excludes
   const matcher = new FileMatcher(appDir, destination, macroExpander)
 
-  function addPatterns(patterns: Array<string | FileSet> | string | null | undefined | FileSet) {
+  function addPatterns(patterns: Array<string | FileSet> | string | Nullish | FileSet) {
     if (patterns == null) {
       return
     } else if (!Array.isArray(patterns)) {
@@ -279,7 +294,7 @@ export function getFileMatchers(
   const defaultMatcher = new FileMatcher(options.defaultSrc, defaultDestination, options.macroExpander)
   const fileMatchers: Array<FileMatcher> = []
 
-  function addPatterns(patterns: Array<string | FileSet> | string | null | undefined | FileSet) {
+  function addPatterns(patterns: Array<string | FileSet> | string | Nullish | FileSet) {
     if (patterns == null) {
       return
     } else if (!Array.isArray(patterns)) {
@@ -329,28 +344,30 @@ export function copyFiles(matchers: Array<FileMatcher> | null, transformer: File
     return Promise.resolve()
   }
 
-  return BluebirdPromise.map(matchers, async (matcher: FileMatcher) => {
-    const fromStat = await statOrNull(matcher.from)
-    if (fromStat == null) {
-      log.warn({ from: matcher.from }, `file source doesn't exist`)
-      return
-    }
-
-    if (fromStat.isFile()) {
-      const toStat = await statOrNull(matcher.to)
-      // https://github.com/electron-userland/electron-builder/issues/1245
-      if (toStat != null && toStat.isDirectory()) {
-        return await copyOrLinkFile(matcher.from, path.join(matcher.to, path.basename(matcher.from)), fromStat, isUseHardLink)
+  return Promise.all(
+    matchers.map(async (matcher: FileMatcher) => {
+      const fromStat = await statOrNull(matcher.from)
+      if (fromStat == null) {
+        log.warn({ from: matcher.from }, `file source doesn't exist`)
+        return
       }
 
-      await mkdir(path.dirname(matcher.to), { recursive: true })
-      return await copyOrLinkFile(matcher.from, matcher.to, fromStat)
-    }
+      if (fromStat.isFile()) {
+        const toStat = await statOrNull(matcher.to)
+        // https://github.com/electron-userland/electron-builder/issues/1245
+        if (toStat != null && toStat.isDirectory()) {
+          return await copyOrLinkFile(matcher.from, path.join(matcher.to, path.basename(matcher.from)), fromStat, isUseHardLink)
+        }
 
-    if (matcher.isEmpty() || matcher.containsOnlyIgnore()) {
-      matcher.prependPattern("**/*")
-    }
-    log.debug({ matcher }, "copying files using pattern")
-    return await copyDir(matcher.from, matcher.to, { filter: matcher.createFilter(), transformer, isUseHardLink: isUseHardLink ? USE_HARD_LINKS : null })
-  })
+        await mkdir(path.dirname(matcher.to), { recursive: true })
+        return await copyOrLinkFile(matcher.from, matcher.to, fromStat)
+      }
+
+      if (matcher.isEmpty() || matcher.containsOnlyIgnore()) {
+        matcher.prependPattern("**/*")
+      }
+      log.debug({ matcher }, "copying files using pattern")
+      return await copyDir(matcher.from, matcher.to, { filter: matcher.createFilter(), transformer, isUseHardLink: isUseHardLink ? USE_HARD_LINKS : null })
+    })
+  )
 }

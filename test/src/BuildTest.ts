@@ -1,15 +1,16 @@
 import { checkBuildRequestOptions } from "app-builder-lib"
-import { doMergeConfigs } from "app-builder-lib/out/util/config"
+import { doMergeConfigs } from "app-builder-lib/out/util/config/config"
 import { Arch, createTargets, DIR_TARGET, Platform } from "electron-builder"
-import { promises as fs } from "fs"
-import { outputJson } from "fs-extra"
-import * as path from "path"
 import { createYargs } from "electron-builder/out/builder"
-import { app, appTwo, appTwoThrows, assertPack, linuxDirTarget, modifyPackageJson, packageJson, toSystemIndependentPath } from "./helpers/packTester"
+import { promises as fs } from "fs"
+import { outputFile, outputJson } from "fs-extra"
+import * as path from "path"
+import { app, appTwo, appTwoThrows, assertPack, getFixtureDir, linuxDirTarget, modifyPackageJson, packageJson, toSystemIndependentPath } from "./helpers/packTester"
 import { ELECTRON_VERSION } from "./helpers/testConfig"
 import { verifySmartUnpack } from "./helpers/verifySmartUnpack"
+import { spawn } from "builder-util/out/util"
 
-test("cli", async () => {
+test.ifLinux("cli", ({ expect }) => {
   // because these methods are internal
   const { configureBuildCommand, normalizeOptions } = require("electron-builder/out/builder")
   const yargs = createYargs()
@@ -49,7 +50,7 @@ test("cli", async () => {
   })
 })
 
-test("merge configurations", () => {
+test("merge configurations", ({ expect }) => {
   const result = doMergeConfigs([
     {
       files: [
@@ -111,9 +112,9 @@ test("merge configurations", () => {
   })
 })
 
-test(
-  "build in the app package.json",
+test("build in the app package.json", ({ expect }) =>
   appTwoThrows(
+    expect,
     { targets: linuxDirTarget },
     {
       projectDirCreated: it =>
@@ -127,12 +128,11 @@ test(
           true
         ),
     }
-  )
-)
+  ))
 
-test(
-  "relative index",
+test("relative index", ({ expect }) =>
   appTwo(
+    expect,
     {
       targets: linuxDirTarget,
     },
@@ -146,12 +146,11 @@ test(
           true
         ),
     }
-  )
-)
+  ))
 
-it.ifDevOrLinuxCi(
-  "electron version from electron-prebuilt dependency",
+it.ifDevOrLinuxCi("electron version from electron-prebuilt dependency", ({ expect }) =>
   app(
+    expect,
     {
       targets: linuxDirTarget,
     },
@@ -170,9 +169,9 @@ it.ifDevOrLinuxCi(
   )
 )
 
-test.ifDevOrLinuxCi(
-  "electron version from electron dependency",
+test.ifDevOrLinuxCi("electron version from electron dependency", ({ expect }) =>
   app(
+    expect,
     {
       targets: linuxDirTarget,
     },
@@ -191,9 +190,9 @@ test.ifDevOrLinuxCi(
   )
 )
 
-test.ifDevOrLinuxCi(
-  "electron version from build",
+test.ifDevOrLinuxCi("electron version from build", ({ expect }) =>
   app(
+    expect,
     {
       targets: linuxDirTarget,
     },
@@ -207,42 +206,95 @@ test.ifDevOrLinuxCi(
   )
 )
 
-test(
-  "www as default dir",
+test("www as default dir", ({ expect }) =>
   appTwo(
+    expect,
     {
       targets: Platform.LINUX.createTarget(DIR_TARGET),
     },
     {
       projectDirCreated: projectDir => fs.rename(path.join(projectDir, "app"), path.join(projectDir, "www")),
     }
-  )
-)
+  ))
 
-test.ifLinuxOrDevMac("afterPack", () => {
-  let called = 0
+test.ifLinuxOrDevMac("hooks as functions", ({ expect }) => {
+  let artifactBuildStartedCalled = 0
+  let artifactBuildCompletedCalled = 0
+  let beforePackCalled = 0
+  let afterPackCalled = 0
+  let afterExtractCalled = 0
   return assertPack(
+    expect,
     "test-app-one",
     {
-      targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET),
+      targets: createTargets([Platform.LINUX, Platform.MAC], "zip", "x64"),
       config: {
+        artifactBuildStarted: () => {
+          artifactBuildStartedCalled++
+        },
+        artifactBuildCompleted: () => {
+          artifactBuildCompletedCalled++
+        },
+        beforePack: () => {
+          beforePackCalled++
+          return Promise.resolve()
+        },
+        afterExtract: () => {
+          afterExtractCalled++
+          return Promise.resolve()
+        },
         afterPack: () => {
-          called++
+          afterPackCalled++
           return Promise.resolve()
         },
       },
     },
     {
       packed: async () => {
-        expect(called).toEqual(2)
+        expect(artifactBuildStartedCalled).toEqual(2)
+        expect(artifactBuildCompletedCalled).toEqual(3) // 2 artifacts + blockmap
+        expect(beforePackCalled).toEqual(2)
+        expect(afterExtractCalled).toEqual(2)
+        expect(afterPackCalled).toEqual(2)
+        expect(afterPackCalled).toEqual(2)
+        return Promise.resolve()
       },
     }
   )
 })
 
-test.ifWindows("afterSign", () => {
+test.ifLinuxOrDevMac("hooks as file - cjs", async ({ expect }) => {
+  const hookScript = path.join(getFixtureDir(), "build-hook.cjs")
+  return assertPack(expect, "test-app-one", {
+    targets: createTargets([Platform.LINUX, Platform.MAC], "zip", "x64"),
+    config: {
+      artifactBuildStarted: hookScript,
+      artifactBuildCompleted: hookScript,
+      beforePack: hookScript,
+      afterExtract: hookScript,
+      afterPack: hookScript,
+    },
+  })
+})
+
+// test.only("hooks as file - mjs exported functions", async ({ expect }) => {
+//   const hookScript = path.join(getFixtureDir(), "build-hook.mjs")
+//   return assertPack(expect,"test-app-one", {
+//     targets: createTargets([Platform.LINUX, Platform.MAC], "zip", "x64"),
+//     config: {
+//       artifactBuildStarted: hookScript,
+//       artifactBuildCompleted: hookScript,
+//       beforePack: hookScript,
+//       afterExtract: hookScript,
+//       afterPack: hookScript,
+//     },
+//   })
+// })
+
+test.ifWindows("afterSign", ({ expect }) => {
   let called = 0
   return assertPack(
+    expect,
     "test-app-one",
     {
       targets: createTargets([Platform.LINUX, Platform.WINDOWS], DIR_TARGET),
@@ -257,14 +309,16 @@ test.ifWindows("afterSign", () => {
       packed: async () => {
         // afterSign is only called when an app is actually signed and ignored otherwise.
         expect(called).toEqual(1)
+        return Promise.resolve()
       },
     }
   )
 })
 
-test.ifLinuxOrDevMac("beforeBuild", () => {
+test.ifLinuxOrDevMac("beforeBuild", ({ expect }) => {
   let called = 0
   return assertPack(
+    expect,
     "test-app-one",
     {
       targets: createTargets([Platform.LINUX, Platform.MAC], DIR_TARGET),
@@ -272,25 +326,28 @@ test.ifLinuxOrDevMac("beforeBuild", () => {
         npmRebuild: true,
         beforeBuild: async () => {
           called++
+          return Promise.resolve()
         },
       },
     },
     {
       packed: async () => {
         expect(called).toEqual(2)
+        return Promise.resolve()
       },
     }
   )
 })
 
 // https://github.com/electron-userland/electron-builder/issues/1738
-test.ifDevOrLinuxCi("win smart unpack", () => {
+test.ifDevOrLinuxCi("win smart unpack", ({ expect }) => {
   // test onNodeModuleFile hook
   const nodeModuleFiles: Array<string> = []
   let p = ""
   return app(
+    expect,
     {
-      targets: Platform.WINDOWS.createTarget(DIR_TARGET),
+      targets: Platform.WINDOWS.createTarget(DIR_TARGET, Arch.x64),
       config: {
         npmRebuild: true,
         onNodeModuleFile: file => {
@@ -299,11 +356,16 @@ test.ifDevOrLinuxCi("win smart unpack", () => {
             nodeModuleFiles.push(name)
           }
         },
+        win: {
+          signAndEditExecutable: false, // setting `true` will fail on arm64 macs, even within docker container since rcedit doesn't work within wine on arm64
+        },
       },
     },
     {
-      projectDirCreated: projectDir => {
+      isInstallDepsBefore: true,
+      projectDirCreated: async projectDir => {
         p = projectDir
+        process.env.npm_config_user_agent = "npm"
         return packageJson(it => {
           it.dependencies = {
             debug: "3.1.0",
@@ -314,17 +376,50 @@ test.ifDevOrLinuxCi("win smart unpack", () => {
         })(projectDir)
       },
       packed: async context => {
-        await verifySmartUnpack(context.getResources(Platform.WINDOWS))
+        await verifySmartUnpack(expect, context.getResources(Platform.WINDOWS))
         expect(nodeModuleFiles).toMatchSnapshot()
       },
     }
-  )()
+  )
+})
+
+test.ifDevOrWinCi("smart unpack local module with dll file", ({ expect }) => {
+  return app(
+    expect,
+    {
+      targets: Platform.WINDOWS.createTarget(DIR_TARGET, Arch.x64),
+    },
+    {
+      isInstallDepsBefore: true,
+      projectDirCreated: async (projectDir, tmpDir) => {
+        const tempDir = await tmpDir.getTempDir()
+        const localPath = path.join(tempDir, "foo")
+        await outputFile(path.join(localPath, "package.json"), `{"name":"foo","version":"9.0.0","main":"index.js","license":"MIT"}`)
+        await outputFile(path.join(localPath, "test.dll"), `test`)
+        await modifyPackageJson(projectDir, data => {
+          data.dependencies = {
+            debug: "3.1.0",
+            "edge-cs": "1.2.1",
+            foo: `file:${localPath}`,
+          }
+        })
+
+        // we can't use `isInstallDepsBefore` as `localPath` is dynamic and changes for every which causes `--frozen-lockfile` and `npm ci` to fail
+        await spawn("npm", ["install"], {
+          cwd: projectDir,
+        })
+      },
+      packed: async context => {
+        await verifySmartUnpack(expect, context.getResources(Platform.WINDOWS))
+      },
+    }
+  )
 })
 
 // https://github.com/electron-userland/electron-builder/issues/1738
-test.ifDevOrLinuxCi(
-  "posix smart unpack",
+test.ifDevOrLinuxCi("posix smart unpack", ({ expect }) =>
   app(
+    expect,
     {
       targets: linuxDirTarget,
       config: {
@@ -332,26 +427,36 @@ test.ifDevOrLinuxCi(
         // tslint:disable-next-line:no-invalid-template-strings
         copyright: "Copyright © 2018 ${author}",
         npmRebuild: true,
+        onNodeModuleFile: filePath => {
+          // Force include this directory in the package
+          return filePath.includes("node_modules/three/examples")
+        },
         files: [
           // test ignore pattern for node_modules defined as file set filter
           {
-            filter: ["!node_modules/napi-build-utils/napi-build-utils-1.0.0.tgz", "!node_modules/node-abi/*"],
+            filter: ["!node_modules/napi-build-utils/napi-build-utils-1.0.0.tgz", "!node_modules/node-abi/*", "!node_modules/**/eslint-format.js"],
           },
         ],
       },
     },
     {
-      projectDirCreated: packageJson(it => {
-        it.dependencies = {
-          debug: "4.1.1",
-          "edge-cs": "1.2.1",
-          "lzma-native": "8.0.6",
-          keytar: "7.9.0",
-        }
-      }),
-      packed: context => {
+      isInstallDepsBefore: true,
+      projectDirCreated: projectDir => {
+        process.env.npm_config_user_agent = "npm"
+        return packageJson(it => {
+          it.dependencies = {
+            debug: "4.1.1",
+            "edge-cs": "1.2.1",
+            keytar: "7.9.0",
+            three: "0.160.0",
+          }
+        })(projectDir)
+      },
+      packed: async context => {
         expect(context.packager.appInfo.copyright).toBe("Copyright © 2018 Foo Bar")
-        return verifySmartUnpack(context.getResources(Platform.LINUX))
+        await verifySmartUnpack(expect, context.getResources(Platform.LINUX), async asarFs => {
+          return expect(await asarFs.readFile(`node_modules${path.sep}three${path.sep}examples${path.sep}fonts${path.sep}README.md`)).toMatchSnapshot()
+        })
       },
     }
   )

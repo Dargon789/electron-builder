@@ -1,3 +1,940 @@
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.20...v) (2025-10-05)
+
+
+### Bug Fixes
+
+*  incorrect cache name set when `ELECTRON_BUILDER_CACHE` env var is present ([#9293](https://github.com/electron-userland/electron-builder/issues/9293)) ([e5f5799](https://github.com/electron-userland/electron-builder/commit/e5f5799fbb193a7a8700fcaaf1ab9e79c9c694ce))
+* Optional dep's path cannot find in newest npm ([#9274](https://github.com/electron-userland/electron-builder/issues/9274)) ([38c2085](https://github.com/electron-userland/electron-builder/commit/38c2085e9a344812d32611d197d1df66d6644b45)), closes [#9259](https://github.com/electron-userland/electron-builder/issues/9259)
+* utilize a js helper `dynamic-import.js` for trying `await import` and `require` ([#9299](https://github.com/electron-userland/electron-builder/issues/9299)) ([9f06a85](https://github.com/electron-userland/electron-builder/commit/9f06a859f9c82b305d0a43c5b6e8c47d1c7451f1))
+
+
+### Features
+
+* **electron-publish:** add gitlab publisher ([#9209](https://github.com/electron-userland/electron-builder/issues/9209)) ([6fd391d](https://github.com/electron-userland/electron-builder/commit/6fd391d9e8390c00c8b0674d8ac3a5b7b6f0f19f))
+* Expanding `${arch}` macro for `mac.binaries` in case of unpacked files within universal builds ([#9263](https://github.com/electron-userland/electron-builder/issues/9263)) ([08773af](https://github.com/electron-userland/electron-builder/commit/08773afadfe10911ed1dff084fefe1024c5a74d8))
+* improve detecting pm and support bun ([#9262](https://github.com/electron-userland/electron-builder/issues/9262)) ([c51f962](https://github.com/electron-userland/electron-builder/commit/c51f96272517c08a09504445fb31e61326e0c381))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.19...v) (2025-08-29)
+
+
+### Bug Fixes
+
+* add quotation marks around variable in AppArmor profile ([#9231](https://github.com/electron-userland/electron-builder/issues/9231)) ([f262a73](https://github.com/electron-userland/electron-builder/commit/f262a7358dafe189b5d9bf06d7be43478ee35faa))
+* auto-update powershell script for powershell version test with  `ConvertTo-Json test` ([#9232](https://github.com/electron-userland/electron-builder/issues/9232)) ([cfc4f36](https://github.com/electron-userland/electron-builder/commit/cfc4f36a5af20fb6c61dc7dfa6202cbc0fd9f201))
+* Change dependency collection to parse from root ([#9260](https://github.com/electron-userland/electron-builder/issues/9260)) ([49c782c](https://github.com/electron-userland/electron-builder/commit/49c782cb838e495f60c4d284df8ab4b56b619da9))
+* correct broken links in builder.ts and cli.md ([#9218](https://github.com/electron-userland/electron-builder/issues/9218)) ([e375149](https://github.com/electron-userland/electron-builder/commit/e37514998a25ada30c4e776e43134d466cac7221))
+* **deps:** update dependency form-data to v4.0.4 [security] ([#9212](https://github.com/electron-userland/electron-builder/issues/9212)) ([7977708](https://github.com/electron-userland/electron-builder/commit/79777089ca2b98c55dd1cabd157ec420994af696))
+* detect wrong package manager for two package.json structure ([#9257](https://github.com/electron-userland/electron-builder/issues/9257)) ([b778686](https://github.com/electron-userland/electron-builder/commit/b778686fb7f9294ec74bcb9a213a7f311a21357e))
+* **electron-updater:** Do not wrap update command when updating with sudo ([#9225](https://github.com/electron-userland/electron-builder/issues/9225)) ([d27ac52](https://github.com/electron-userland/electron-builder/commit/d27ac523bb1581f274c018952d55162315e7a9b8))
+* fix argument names mismatch in publish command to make it work ([#9227](https://github.com/electron-userland/electron-builder/issues/9227)) ([8f0ad06](https://github.com/electron-userland/electron-builder/commit/8f0ad06eae4716b7b753301531241166a7333058))
+* flaky unit tests  ([#9251](https://github.com/electron-userland/electron-builder/issues/9251)) ([80f5f83](https://github.com/electron-userland/electron-builder/commit/80f5f83d5f35337853af488d2abe9e6f9187e3d5))
+* generate stubExecutableExe and sign it ([#8959](https://github.com/electron-userland/electron-builder/issues/8959)) ([0ad8f91](https://github.com/electron-userland/electron-builder/commit/0ad8f91cd5478a2063eb9e20df47797c8b42d48c))
+* **nsis:** fix file association ([#9217](https://github.com/electron-userland/electron-builder/issues/9217)) ([e9251f4](https://github.com/electron-userland/electron-builder/commit/e9251f4725f1f7c14c9792f5af8053dde1793d6a))
+* **nsis:** undefined vars when `customCheckAppRunning` is defined ([#9245](https://github.com/electron-userland/electron-builder/issues/9245)) ([3735881](https://github.com/electron-userland/electron-builder/commit/3735881f3259d0638d24fadc75809e5ea76114d7))
+* scrubbing more aggressively anything in the logs ([#9182](https://github.com/electron-userland/electron-builder/issues/9182)) ([c54a060](https://github.com/electron-userland/electron-builder/commit/c54a0609753a11d032f87e727eccbab1f6836081))
+* **squirrel-windows:** update loadingGif handling to prioritize user-defined option ([#9222](https://github.com/electron-userland/electron-builder/issues/9222)) ([9997660](https://github.com/electron-userland/electron-builder/commit/9997660e20cbdaa4ddb01d1c6078dea91097d6f0))
+* strip auth headers for GitHub release assets redirects ([#9211](https://github.com/electron-userland/electron-builder/issues/9211)) ([7c7fd6c](https://github.com/electron-userland/electron-builder/commit/7c7fd6ca240eda72048835f754adac92c4ab4e8c))
+* support option to override publish trigger (`--policy`) in publish command ([#9228](https://github.com/electron-userland/electron-builder/issues/9228)) ([d031eea](https://github.com/electron-userland/electron-builder/commit/d031eeaa7eb282e516471eed2e2a764716999b20))
+* **test:** gitlab related failed cases ([#9221](https://github.com/electron-userland/electron-builder/issues/9221)) ([c6d0ff9](https://github.com/electron-userland/electron-builder/commit/c6d0ff9870457d122f9fde6e10315a975bc696aa))
+* uncaught exception during differential downloading via multipleRangDownloader ([#9248](https://github.com/electron-userland/electron-builder/issues/9248)) ([8cbf079](https://github.com/electron-userland/electron-builder/commit/8cbf079ec20bbc642f9b6c306e3e9141a1fcc385))
+* **yarn:** check for dependencies in both projectDir and appDir during installation ([#9219](https://github.com/electron-userland/electron-builder/issues/9219)) ([cf0ac45](https://github.com/electron-userland/electron-builder/commit/cf0ac45db79e3e3ff1cef3ad931f7272646d1cb1))
+
+
+### Features
+
+* **github:** Add `tagNamePrefix` option to github publisher options (deprecates  `vPrefixedTagName`) ([#9216](https://github.com/electron-userland/electron-builder/issues/9216)) ([44b2899](https://github.com/electron-userland/electron-builder/commit/44b28997f15314730d1bb69303a47dc26f7950d1))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.18...v) (2025-07-15)
+
+
+### Bug Fixes
+
+* change installOptions to use npm in yarn PM ([#9197](https://github.com/electron-userland/electron-builder/issues/9197)) ([6cc5d2e](https://github.com/electron-userland/electron-builder/commit/6cc5d2ee45250aae4a05872ae5b800a9e5cca939))
+* **nsis:** implement custom function to handle /D parameter with spaces ([#9196](https://github.com/electron-userland/electron-builder/issues/9196)) ([21e4ea2](https://github.com/electron-userland/electron-builder/commit/21e4ea23819a9133c9166df85e3f0ba54e5a6326))
+* Use `spawn` -> `shell: false` for node module collection ([#9177](https://github.com/electron-userland/electron-builder/issues/9177)) ([35f5f6e](https://github.com/electron-userland/electron-builder/commit/35f5f6e55762ffc377fcd5587a8cea8753184d50))
+
+
+### Features
+
+* **electron-updater:** add `GitLab` provider ([#9186](https://github.com/electron-userland/electron-builder/issues/9186)) ([1a6ea01](https://github.com/electron-userland/electron-builder/commit/1a6ea016b7793c75e7586e0e14d5f26d3535c292))
+* **nsis:** terminate only processes running in installation folder ([#9069](https://github.com/electron-userland/electron-builder/issues/9069)) ([c9480bc](https://github.com/electron-userland/electron-builder/commit/c9480bc0a170cfad1cb3dfcedc7110d39b6cbd26))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.17...v) (2025-07-08)
+
+
+### Bug Fixes
+
+* **fpm:** upgrade fpm to 1.16 and ruby 3.4.3 ([#9100](https://github.com/electron-userland/electron-builder/issues/9100)) ([e02b939](https://github.com/electron-userland/electron-builder/commit/e02b939bc6fc13dfdad3d4c63c86bc01aad618fd))
+* resolve dmg flakiness by upgrading `dmgbuild` python vendor files ([#9163](https://github.com/electron-userland/electron-builder/issues/9163)) ([a2fbc8b](https://github.com/electron-userland/electron-builder/commit/a2fbc8b6666fc58fb7cf1a6fa607695bb3d29a04))
+
+
+### Features
+
+* **app-builder-lib:** use `jiti` for loading TS config file ([#9194](https://github.com/electron-userland/electron-builder/issues/9194)) ([fc7c5a0](https://github.com/electron-userland/electron-builder/commit/fc7c5a0d4c46d0c61f5c9f9c02412b3a3a97b423))
+* **nsis:** added support for uninstall components page ([#9166](https://github.com/electron-userland/electron-builder/issues/9166)) ([61aa855](https://github.com/electron-userland/electron-builder/commit/61aa8557dcab97a516ef2abd8bdadab5eb662879))
+* **nsis:** added translation string for 'closing app' ([#9183](https://github.com/electron-userland/electron-builder/issues/9183)) ([309f1dc](https://github.com/electron-userland/electron-builder/commit/309f1dcacb11231ac8cc2485a286f2ac63bfa085))
+* **updater:** Cache the new blockmap file and allow customization of the old blockmap file base URL. ([#9172](https://github.com/electron-userland/electron-builder/issues/9172)) ([cb651dd](https://github.com/electron-userland/electron-builder/commit/cb651ddb732dd0b8614b1af25054261b978900dd))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.16...v) (2025-06-13)
+
+
+### Bug Fixes
+
+* `electronDist` - detect if directory and copy electron from there, short circuit current logic path ([#9157](https://github.com/electron-userland/electron-builder/issues/9157)) ([092d398](https://github.com/electron-userland/electron-builder/commit/092d398a66057f411fe97fc3450de03bca6033d8))
+* don't assume commands end with .cmd on Windows ([#9026](https://github.com/electron-userland/electron-builder/issues/9026)) ([e56977b](https://github.com/electron-userland/electron-builder/commit/e56977b5c6da25e4d797fd6cb40ea8ca52464fd3))
+* update minimatch to ^10.0.3 to fix downstream issue ([#9162](https://github.com/electron-userland/electron-builder/issues/9162)) ([0b17b35](https://github.com/electron-userland/electron-builder/commit/0b17b351cae84f3360cc8265fc452650c2c71ac3))
+
+
+### Features
+
+* **nsis:** add support for more Windows Installer options ([#9119](https://github.com/electron-userland/electron-builder/issues/9119)) ([73696c6](https://github.com/electron-userland/electron-builder/commit/73696c6da6ea167a571af1226d6e82e94f3459b7))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.15...v) (2025-05-29)
+
+
+### Bug Fixes
+
+* allow custom electron zip name to be provided when unpacking a provided `electronDist` ([#9126](https://github.com/electron-userland/electron-builder/issues/9126)) ([9272cf3](https://github.com/electron-userland/electron-builder/commit/9272cf33a8e3b788979010706e9c564e954a2ee7))
+* **dmg:** `--force` unmount dmg using hdiutil after delay on Resource Lock (code 16) ([#9115](https://github.com/electron-userland/electron-builder/issues/9115)) ([9358b00](https://github.com/electron-userland/electron-builder/commit/9358b00b3985dd65a2c89b65a4c097653e9aebb2))
+* **docs:** Update README.md emoji rendering ([#9110](https://github.com/electron-userland/electron-builder/issues/9110)) ([b87b158](https://github.com/electron-userland/electron-builder/commit/b87b158c12d3a096e8e7b4883438a277633ca3c7))
+* **linux:** `productName` should be used as the default value when `executableName` is not set per docs ([#9068](https://github.com/electron-userland/electron-builder/issues/9068)) ([59fdaa9](https://github.com/electron-userland/electron-builder/commit/59fdaa9f3420f253c735690091169577112793b7))
+* **updater:** don't throw when determining which package manager to use ([#9113](https://github.com/electron-userland/electron-builder/issues/9113)) ([8ba9be4](https://github.com/electron-userland/electron-builder/commit/8ba9be481e3b777aa77884d265fd9b7f927a8a99))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.14...v) (2025-05-04)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @electron/osx-sign to v1.3.3 ([#9083](https://github.com/electron-userland/electron-builder/issues/9083)) ([0ce7b90](https://github.com/electron-userland/electron-builder/commit/0ce7b90e5eec0cf3049e2b3957b4d076fbdd615d))
+* **deps:** update dependency @electron/universal to v2.0.3 ([#9082](https://github.com/electron-userland/electron-builder/issues/9082)) ([6f3aec8](https://github.com/electron-userland/electron-builder/commit/6f3aec8106be0d365e59923410c1eb55cd0328d1))
+* **electron-updater:** allow forceDevUpdateConfig also on Linux ([#9024](https://github.com/electron-userland/electron-builder/issues/9024)) ([e641751](https://github.com/electron-userland/electron-builder/commit/e641751ce36cdf099d62a897c591b2763705dbff))
+* update package manager detection and improve type handling ([#9067](https://github.com/electron-userland/electron-builder/issues/9067)) ([312938d](https://github.com/electron-userland/electron-builder/commit/312938d8519a29992e75e1f544c41ca50ae591e3))
+* update regex for multipart content-type parsing in multipleRange ([#9064](https://github.com/electron-userland/electron-builder/issues/9064)) ([444b791](https://github.com/electron-userland/electron-builder/commit/444b791f9d2812f2a0f60481f7b25297585d9c5a))
+
+
+### Features
+
+* support upgrading from ARM to ARM, rather than upgrading to x64 in window and linux ([#9059](https://github.com/electron-userland/electron-builder/issues/9059)) ([cb77508](https://github.com/electron-userland/electron-builder/commit/cb775088427d25e9ce0489067445716d35e09997))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.13...v) (2025-04-27)
+
+
+### Features
+
+* `customNsisResources` override in nsis options ([#9032](https://github.com/electron-userland/electron-builder/issues/9032)) ([3d65267](https://github.com/electron-userland/electron-builder/commit/3d65267a6c53ca824f70e5b0f5d8f4ba8be38237))
+* add `buildUniversalInstaller` option to NSIS portable configuration ([#9034](https://github.com/electron-userland/electron-builder/issues/9034)) ([80fbf5a](https://github.com/electron-userland/electron-builder/commit/80fbf5a6d8f308415469d4ee96a954932e6f19b7))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.12...v) (2025-04-12)
+
+
+### Bug Fixes
+
+* dependency path is undefined ([#9013](https://github.com/electron-userland/electron-builder/issues/9013)) ([c223866](https://github.com/electron-userland/electron-builder/commit/c223866e366ef1aeeefec0d1a61a14b3d526f23e)), closes [/github.com/electron/rebuild/blob/ff1ec40f82ca64e014079b246053f039b3cf4f23/src/search-module.ts#L76-L86](https://github.com//github.com/electron/rebuild/blob/ff1ec40f82ca64e014079b246053f039b3cf4f23/src/search-module.ts/issues/L76-L86)
+* **mac:** allow ad-hoc identities for codesigning ([#9007](https://github.com/electron-userland/electron-builder/issues/9007)) ([bff46ec](https://github.com/electron-userland/electron-builder/commit/bff46ec41c4a7715cc06f7dfd6ff95f8e4bbe869))
+* malformed `Files` param when using Azure Trusted Signing ([#8987](https://github.com/electron-userland/electron-builder/issues/8987)) ([9fb2895](https://github.com/electron-userland/electron-builder/commit/9fb2895cd008ea6fc6210078decabc15a5c0144a))
+* missing lowercase comparison in electron-updater ([#8992](https://github.com/electron-userland/electron-builder/issues/8992)) ([1f50540](https://github.com/electron-userland/electron-builder/commit/1f5054004468f76d316cee33ef6cc8717987b146))
+* remove implicit dependencies handling ([#9010](https://github.com/electron-userland/electron-builder/issues/9010)) ([8bd1a10](https://github.com/electron-userland/electron-builder/commit/8bd1a10a2dcdee080e3b5a0359453d5d34b3ffbf)), closes [#9000](https://github.com/electron-userland/electron-builder/issues/9000)
+
+
+### Features
+
+* **electron-updater:** allow overriding `AppUpdater.isStagingMatch` with hook `isUserWithinRollout` ([#9021](https://github.com/electron-userland/electron-builder/issues/9021)) ([cf43f05](https://github.com/electron-userland/electron-builder/commit/cf43f0567c6addaf3cefd7eadada95bd543165e1))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.11...v) (2025-03-20)
+
+
+### Bug Fixes
+
+* Azure trust signing fails with spaces in parameters ([#8979](https://github.com/electron-userland/electron-builder/issues/8979)) ([f24a2ce](https://github.com/electron-userland/electron-builder/commit/f24a2ce05cfbc88b79c1d743d13c898d70be99df))
+* optimize workspace package resolution in dependency tree ([#8958](https://github.com/electron-userland/electron-builder/issues/8958)) ([81e0c47](https://github.com/electron-userland/electron-builder/commit/81e0c472fe2691b716aba5428dedc5da1c57e773))
+* pnpm collection of optional dependencies ([#8957](https://github.com/electron-userland/electron-builder/issues/8957)) ([ad151b9](https://github.com/electron-userland/electron-builder/commit/ad151b9dbefa746514dd15471e5ef8bf5eed1d9b))
+* re-enable CI build workflow by swapping in `dorny/paths-filter` ([#8961](https://github.com/electron-userland/electron-builder/issues/8961)) ([1d47cb1](https://github.com/electron-userland/electron-builder/commit/1d47cb1dfcc77e5f21628623720a7948401548c4))
+* support `mas` packages for flipping fuses ([#8947](https://github.com/electron-userland/electron-builder/issues/8947)) ([7ba4fea](https://github.com/electron-userland/electron-builder/commit/7ba4fea95825650f02749949632b351c75d3019a))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.10...v) (2025-03-09)
+
+
+### Bug Fixes
+
+* `after-install.tpl` - Detect if `apparmor` is enabled instead of just file-exists check ([#8932](https://github.com/electron-userland/electron-builder/issues/8932)) ([e1ea62b](https://github.com/electron-userland/electron-builder/commit/e1ea62b0029c4adca20196ef060948777caeac37))
+* find cwd using `getProjectRootPath` for detecting package manager ([#8941](https://github.com/electron-userland/electron-builder/issues/8941)) ([14b96df](https://github.com/electron-userland/electron-builder/commit/14b96dfcbb7e4fd114169c35b50932bf5777fcf1))
+* re-export various types from electron-updater ([#8933](https://github.com/electron-userland/electron-builder/issues/8933)) ([324032c](https://github.com/electron-userland/electron-builder/commit/324032c5ea94b983cda8a5510fcc1a3fb752a1a1))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.9...v) (2025-03-03)
+
+
+### Bug Fixes
+
+* custom publisher extension check and throw error if not found ([#8926](https://github.com/electron-userland/electron-builder/issues/8926)) ([3caab3c](https://github.com/electron-userland/electron-builder/commit/3caab3c4226a73ab458ac5a315aff160c5500b94))
+* **win:** execute `customUnInstall` before `atomicRMDir` function in NSIS uninstaller ([#8915](https://github.com/electron-userland/electron-builder/issues/8915)) ([8903c5d](https://github.com/electron-userland/electron-builder/commit/8903c5df046b74411f3b1fa958cef9a5955d01ef))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.8...v) (2025-02-26)
+
+
+### Bug Fixes
+
+* `AsyncEventEmitter` `filterListeners` doesn't work with promises ([#8895](https://github.com/electron-userland/electron-builder/issues/8895)) ([22da644](https://github.com/electron-userland/electron-builder/commit/22da64425182456eb4d1243138dde27c80d6adac))
+* allow publishing to Snap Store to be disabled with snap-specific `snap.publish` options ([#8896](https://github.com/electron-userland/electron-builder/issues/8896)) ([67b6f71](https://github.com/electron-userland/electron-builder/commit/67b6f71f85798dba4ce51dfb2cd012e04cd391db))
+* allow usage of `node-linker=hoisted` with pnpm ([#8885](https://github.com/electron-userland/electron-builder/issues/8885)) ([4cc475e](https://github.com/electron-userland/electron-builder/commit/4cc475ed214861b99075d4639c92686803420174))
+* **mac:** when using default `osx-sign`, specifically pass in identity name instead of hash ([#8908](https://github.com/electron-userland/electron-builder/issues/8908)) ([62029b0](https://github.com/electron-userland/electron-builder/commit/62029b08c10a6b12d8ef30bf57ae61a877f297f4))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.7...v) (2025-02-21)
+
+
+### Features
+
+* allow usage of `.cjs`, `.mjs`, and `type=module` custom publishers. Adds `AsyncEventEmitter`. ([#8868](https://github.com/electron-userland/electron-builder/issues/8868)) ([48c9f88](https://github.com/electron-userland/electron-builder/commit/48c9f88b185cbc4a52926e6e10791bf293ecda6f))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.6...v) (2025-02-18)
+
+
+### Bug Fixes
+
+* Detected circular dependencies and add debug logs for nodeModulesCollector ([#8864](https://github.com/electron-userland/electron-builder/issues/8864)) ([3fe27d7](https://github.com/electron-userland/electron-builder/commit/3fe27d77587a05a7d568b3b21f1df8f0a1650c92))
+* Sign the vendor directory instead of using Squirrel.Windows' signing method. ([#8855](https://github.com/electron-userland/electron-builder/issues/8855)) ([bee179b](https://github.com/electron-userland/electron-builder/commit/bee179b3cf8163041d280ed8dc5a5ce4f27786c6))
+* validate key before proceeding with deep assignment ([#8869](https://github.com/electron-userland/electron-builder/issues/8869)) ([c12f86f](https://github.com/electron-userland/electron-builder/commit/c12f86f2e254809e70d1f60d89cf9b7264278083))
+
+
+### Features
+
+* **updater:** Dispatch error in updater if `spawnSyncLog` fails ([#8817](https://github.com/electron-userland/electron-builder/issues/8817)) ([ea3e0f5](https://github.com/electron-userland/electron-builder/commit/ea3e0f5ff8ac9a5e01bcd11585d9f5e6a57b076e))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.5...v) (2025-02-06)
+
+
+### Bug Fixes
+
+* missing `ms` package when pruning non-prod dependencies ([#8851](https://github.com/electron-userland/electron-builder/issues/8851)) ([0f2c963](https://github.com/electron-userland/electron-builder/commit/0f2c96379143e3dde960ed45bb3e1b74449540f1))
+* Only update AppArmor profile if not chroot'ed ([#8843](https://github.com/electron-userland/electron-builder/issues/8843)) ([7fc7846](https://github.com/electron-userland/electron-builder/commit/7fc784603d580fc6dc183e02118734ea4ffeb257))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.4...v) (2025-02-05)
+
+
+### Bug Fixes
+
+* ignore `peerDependencies` when collecting node modules tree ([#8845](https://github.com/electron-userland/electron-builder/issues/8845)) ([53ee6c6](https://github.com/electron-userland/electron-builder/commit/53ee6c6c498a4cc4e64d580c4ec6564137060eae))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.3...v) (2025-02-04)
+
+
+### Features
+
+* switch app-builder-bin to node-module-collector to get all production node modules ([#8571](https://github.com/electron-userland/electron-builder/issues/8571)) ([04be569](https://github.com/electron-userland/electron-builder/commit/04be5699c664e6a93e093b820a16ad516355b5c7))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.2...v) (2025-02-03)
+
+
+### Features
+
+* **pkg:** support notarizing `pkg` for macos archives ([#8834](https://github.com/electron-userland/electron-builder/issues/8834)) ([6261c9a](https://github.com/electron-userland/electron-builder/commit/6261c9a038ecd73c55ac3909825d5d3d7fa43664))
+* use electron-winstaller instead of self module ([#8344](https://github.com/electron-userland/electron-builder/issues/8344)) ([27b2ba8](https://github.com/electron-userland/electron-builder/commit/27b2ba8129f0e9ad102ca3120c7d7a0f9d29b8eb))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.1...v) (2025-02-03)
+
+
+### Bug Fixes
+
+* handle yarn berry `patch` format in electron-updater version check ([#8830](https://github.com/electron-userland/electron-builder/issues/8830)) ([44603f2](https://github.com/electron-userland/electron-builder/commit/44603f2f3cc0e00e1c2c2420c7d440d587f8feca))
+* upgrading TrustedSigning module to 0.5.0 ([#8833](https://github.com/electron-userland/electron-builder/issues/8833)) ([f5af99a](https://github.com/electron-userland/electron-builder/commit/f5af99ac87ef585a7f7ba548d3fb92811f845ba3))
+
+
+### Features
+
+* add `isUpdateAvailable` property to `checkForUpdates` result ([#8829](https://github.com/electron-userland/electron-builder/issues/8829)) ([14ee2d6](https://github.com/electron-userland/electron-builder/commit/14ee2d6be32fd6e9165381e0709e5a2e8049ece2))
+* Allow users to pass a custom headers URL via env var `npm_config_electron_mirror` ([#8785](https://github.com/electron-userland/electron-builder/issues/8785)) ([b3adf48](https://github.com/electron-userland/electron-builder/commit/b3adf4800b4ed240bb21a6a0a6ccdd57670e5d26))
+* **pkg:** support extra component packages (`.pkg`) for macos archives ([#8767](https://github.com/electron-userland/electron-builder/issues/8767)) ([f45a09e](https://github.com/electron-userland/electron-builder/commit/f45a09eeeb9d2fb5c4a45bd7bf3990c4acb3c538))
+* **updater:** add custom `isUpdateSupported` hook for validating update downloads ([#8692](https://github.com/electron-userland/electron-builder/issues/8692)) ([96c5d14](https://github.com/electron-userland/electron-builder/commit/96c5d14027d56473ae5dd843c023709a01782963))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0...v) (2025-01-30)
+
+
+### Bug Fixes
+
+* allow `skipLibCheck: false` ([#8813](https://github.com/electron-userland/electron-builder/issues/8813)) ([0742966](https://github.com/electron-userland/electron-builder/commit/07429661c0da2248cec5b92eb03390ae19266328))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.11...v) (2025-01-26)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.10...v) (2025-01-25)
+
+
+### Bug Fixes
+
+* ASAR files in `extraResources` are not included in integrity calculations ([#8805](https://github.com/electron-userland/electron-builder/issues/8805)) ([c6d6b6e](https://github.com/electron-userland/electron-builder/commit/c6d6b6e57be2c042dc586ae13f1af38a8a19af41))
+* **linux:** AppImage doesn't update when filename contains spaces ([#8802](https://github.com/electron-userland/electron-builder/issues/8802)) ([4a68fd2](https://github.com/electron-userland/electron-builder/commit/4a68fd2d3d529b0f854877a5415f9ccad00b61fd))
+* **mac:** only fuse macOS universal builds on the combined `universal` package ([#8799](https://github.com/electron-userland/electron-builder/issues/8799)) ([45a402b](https://github.com/electron-userland/electron-builder/commit/45a402b9786bcb8e71bfc12c9498552f597653ec))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.9...v) (2025-01-21)
+
+
+### Bug Fixes
+
+* docker deploy script runs out of space on single runner ([#8788](https://github.com/electron-userland/electron-builder/issues/8788)) ([8d6a600](https://github.com/electron-userland/electron-builder/commit/8d6a600caf9740a7effd70e9c8c1dc73fd61382e))
+* docker image loader for deploy pipeline ([#8780](https://github.com/electron-userland/electron-builder/issues/8780)) ([6f6e272](https://github.com/electron-userland/electron-builder/commit/6f6e2726009d1c894bc9231eee4e9ffddb7c6ac4))
+* **mac:** always build dmg's with APFS (BREAKING) ([#8782](https://github.com/electron-userland/electron-builder/issues/8782)) ([633490c](https://github.com/electron-userland/electron-builder/commit/633490cb395c0af8027116b345500c58a7616964))
+
+
+### Features
+
+* **docker:** support `pwsh` for running codesigning ([#8787](https://github.com/electron-userland/electron-builder/issues/8787)) ([cdf18d9](https://github.com/electron-userland/electron-builder/commit/cdf18d9a0f65068e179e43152699c366c4c29467))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.8...v) (2025-01-14)
+
+
+### Bug Fixes
+
+* **docs:** downgrade typedoc-plugin-markdown to fix docs site generation ([#8755](https://github.com/electron-userland/electron-builder/issues/8755)) ([5c44725](https://github.com/electron-userland/electron-builder/commit/5c4472510a9dbefbe781aaa50252d9ad78b9f8ed))
+* electron-builder fails when list of node_modules files is too big to pass in a glob ([#8725](https://github.com/electron-userland/electron-builder/issues/8725)) ([ccbf0a5](https://github.com/electron-userland/electron-builder/commit/ccbf0a5be38e1d8e405ed9d2bc9f3b2755548182))
+* typo in urls in tsdoc ([#8749](https://github.com/electron-userland/electron-builder/issues/8749)) ([ee2c6dc](https://github.com/electron-userland/electron-builder/commit/ee2c6dc133ed31fd82ad8fdf864651494c88fcf8))
+* update @electron/asar to 3.2.18 to resolve signing issue with framework symlinks ([#8762](https://github.com/electron-userland/electron-builder/issues/8762)) ([c4f5497](https://github.com/electron-userland/electron-builder/commit/c4f54977045ad3f6f7637004f632c37bfb41e79a))
+* use `disableDifferentialDownload` flag in the AppImageBuilder ([#8695](https://github.com/electron-userland/electron-builder/issues/8695)) ([819eff7](https://github.com/electron-userland/electron-builder/commit/819eff7bf7f319275d70faf3a64a5a18a3793a7c))
+
+
+### Features
+
+* **nsis:** allow disabling of building a universal nsis installer  ([#8607](https://github.com/electron-userland/electron-builder/issues/8607)) ([f123628](https://github.com/electron-userland/electron-builder/commit/f123628ce400b5e65d0e4f0966e5cc65a1f3b8a5))
+* support completely custom AppxManifest.xml ([#8609](https://github.com/electron-userland/electron-builder/issues/8609)) ([d672b04](https://github.com/electron-userland/electron-builder/commit/d672b04b4746170c07bc39b7b049ab0c584e7a19))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.7...v) (2024-12-16)
+
+
+### Bug Fixes
+
+* install all dependencies to fix building within NPM workspaces ([#8715](https://github.com/electron-userland/electron-builder/issues/8715)) ([4c394d5](https://github.com/electron-userland/electron-builder/commit/4c394d54689f03bbca54a083c7e126d9c83e6ed7))
+
+
+### Features
+
+* **keygen:** Add `host` property to support self-hosted Keygen instances ([#8711](https://github.com/electron-userland/electron-builder/issues/8711)) ([6f0fb8e](https://github.com/electron-userland/electron-builder/commit/6f0fb8e44f035bcd6ff0d6f234b38c20fde066af))
+* **publish:** add `forcePathStyle` option to `S3Options` ([#8741](https://github.com/electron-userland/electron-builder/issues/8741)) ([eacbbf5](https://github.com/electron-userland/electron-builder/commit/eacbbf593f6ea01a92ffb41d8d28ee5e4e480ea1))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.6...v) (2024-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency cross-spawn to v7.0.5 [security] ([#8693](https://github.com/electron-userland/electron-builder/issues/8693)) ([6a6bed4](https://github.com/electron-userland/electron-builder/commit/6a6bed46c428b45105ada071a9cb89b5d4f93d9e))
+* **deps:** update dependency eslint to v9.16.0 [security] ([#8717](https://github.com/electron-userland/electron-builder/issues/8717)) ([9381513](https://github.com/electron-userland/electron-builder/commit/9381513df8c2888ebcd999283991bed64b7058e0))
+* smart unpack for local module with dll ([#8645](https://github.com/electron-userland/electron-builder/issues/8645)) ([f4d40f9](https://github.com/electron-userland/electron-builder/commit/f4d40f91f1511fc55cbef7c9e7edfddaf6ab67bc))
+* **win:** corrupt `.exe` asar integrity file path from cross-platform build ([#8689](https://github.com/electron-userland/electron-builder/issues/8689)) ([1d7f87c](https://github.com/electron-userland/electron-builder/commit/1d7f87c1028fa94c9bb80c167bb1fb87cbc84817))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.5...v) (2024-11-07)
+
+
+### Bug Fixes
+
+* docker build script unable to build node 18 image ([#8665](https://github.com/electron-userland/electron-builder/issues/8665)) ([fb26f6a](https://github.com/electron-userland/electron-builder/commit/fb26f6ae32503df46523f5e986ce40f3e3f8dfff))
+* use FileCopier for copying files and queue creation of symlinks ([#8663](https://github.com/electron-userland/electron-builder/issues/8663)) ([866b0ca](https://github.com/electron-userland/electron-builder/commit/866b0caa2859ccff90ec8654f82263569cd2465d))
+
+
+### Features
+
+* add AppArmor profile to FPM targets to pair with `afterInstall` and `afterRemove` template scripts ([#8636](https://github.com/electron-userland/electron-builder/issues/8636)) ([88cc0b0](https://github.com/electron-userland/electron-builder/commit/88cc0b06dba22139721fd1e04f6a1cf2d447edbd))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.4...v) (2024-11-01)
+
+
+### Bug Fixes
+
+* `cscIKeyPassword` must support empty string arguments ([#8653](https://github.com/electron-userland/electron-builder/issues/8653)) ([796e1a0](https://github.com/electron-userland/electron-builder/commit/796e1a072a2bbe97ced6f4be05325c704fc04b7f))
+* **asar:** check ResolvedFileSet src when verifying symlinks to be within project directory ([#8654](https://github.com/electron-userland/electron-builder/issues/8654)) ([9e11358](https://github.com/electron-userland/electron-builder/commit/9e11358fc28249675cd7ec4f7037408cc18dfa8a))
+* **win:** add required `publisherName` field to Azure Trusted Signing options ([#8650](https://github.com/electron-userland/electron-builder/issues/8650)) ([f84a083](https://github.com/electron-userland/electron-builder/commit/f84a0831d1d02b782ad07d4f7feff79d96dd45ec))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.3...v) (2024-10-28)
+
+
+### Bug Fixes
+
+* macUpdater - change `copyFileSync` to async operation to unblock the main thread ([#8623](https://github.com/electron-userland/electron-builder/issues/8623)) ([cfa67c0](https://github.com/electron-userland/electron-builder/commit/cfa67c01827a44c88fb8448562dbe928ba37494f))
+* remove concurrency of windows codesign to resolve azure trusted signing file locks([#8632](https://github.com/electron-userland/electron-builder/issues/8632)) ([645e2ab](https://github.com/electron-userland/electron-builder/commit/645e2abd5ed604fe4f4d9475cf2cedf4fe78436c))
+* use `path` instead of `path/posix` for publishing binaries ([#8631](https://github.com/electron-userland/electron-builder/issues/8631)) ([dcd91a1](https://github.com/electron-userland/electron-builder/commit/dcd91a1f79be5bde7bb418b0eaa83d03f11d41fe))
+* **win:** add rfc3161 timestamp entry with default values for azure signing ([#8627](https://github.com/electron-userland/electron-builder/issues/8627)) ([2a3195d](https://github.com/electron-userland/electron-builder/commit/2a3195d99f42e9b4f70e5719525db046a327aeb7))
+
+
+### Features
+
+* **updater:** allow usage of `autoRunAppAfterInstall` with mac updater ([#8633](https://github.com/electron-userland/electron-builder/issues/8633)) ([96f5c3e](https://github.com/electron-userland/electron-builder/commit/96f5c3ebbd6b3b58c9c5d3e777577d49edcb6e5a))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.2...v) (2024-10-16)
+
+
+### Bug Fixes
+
+* add quotes to surround file path during azure signing to handle files with spaces ([#8606](https://github.com/electron-userland/electron-builder/issues/8606)) ([a0e635c](https://github.com/electron-userland/electron-builder/commit/a0e635c183633c291fd2e0a0e8c9a1c6b8e085a0))
+* check relative path in `asarUtil` without path separator ([#8603](https://github.com/electron-userland/electron-builder/issues/8603)) ([712a8bc](https://github.com/electron-userland/electron-builder/commit/712a8bce56331cd89df270f182fa27bf365e985b))
+* **win): Revert "fix(win:** use appInfo description as primary entry for FileDescription" ([#8601](https://github.com/electron-userland/electron-builder/issues/8601)) ([215fc36](https://github.com/electron-userland/electron-builder/commit/215fc36b5e8d243ef5bc77d31eb8e30d0e8bca9d)), closes [electron-userland/electron-builder#8125](https://github.com/electron-userland/electron-builder/issues/8125)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.1...v) (2024-10-13)
+
+
+### Features
+
+* add integration for `@electron/fuses` ([#8588](https://github.com/electron-userland/electron-builder/issues/8588)) ([8434e10](https://github.com/electron-userland/electron-builder/commit/8434e10dad0893ca11c5f3a17a70470065f96fa0))
+* migrate to `electron/asar` package ([#8570](https://github.com/electron-userland/electron-builder/issues/8570)) ([c848430](https://github.com/electron-userland/electron-builder/commit/c84843053a8f9e0b6af14c6b2ed33c5f82d495b3))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v26.0.0-alpha.0...v) (2024-10-10)
+
+
+### Bug Fixes
+
+*  packages in the workspace not being under node_modules ([#8576](https://github.com/electron-userland/electron-builder/issues/8576)) ([3eab714](https://github.com/electron-userland/electron-builder/commit/3eab7143d74262caace81ea05e97617d07daf336)), closes [/github.com/electron-userland/electron-builder/blob/a25d04d5a8e58b447f0462673a4362414da9ed27/packages/app-builder-lib/src/util/appFileCopier.ts#L191-L203](https://github.com//github.com/electron-userland/electron-builder/blob/a25d04d5a8e58b447f0462673a4362414da9ed27/packages/app-builder-lib/src/util/appFileCopier.ts/issues/L191-L203) [/github.com/electron-userland/electron-builder/blob/a25d04d5a8e58b447f0462673a4362414da9ed27/packages/app-builder-lib/src/util/filter.ts#L28-L36](https://github.com//github.com/electron-userland/electron-builder/blob/a25d04d5a8e58b447f0462673a4362414da9ed27/packages/app-builder-lib/src/util/filter.ts/issues/L28-L36)
+* add additional default exclusions (`node_gyp_bins`, `pnpm-lock.yaml`, `.obj`) to copy logic ([#8577](https://github.com/electron-userland/electron-builder/issues/8577)) ([e9eef0c](https://github.com/electron-userland/electron-builder/commit/e9eef0c1c7f73a5edfe3026f044c6278641077cb))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.6...v) (2024-10-09)
+
+
+### Bug Fixes
+
+* check if the file already starts with a UTF-8 BOM ([#8551](https://github.com/electron-userland/electron-builder/issues/8551)) ([57cebf4](https://github.com/electron-userland/electron-builder/commit/57cebf4dd4c722456245286d2fd795f7a5fc862c))
+* **deploy:** downgrade changesets/cli to 2.25.0 ([#8574](https://github.com/electron-userland/electron-builder/issues/8574)) ([a25d04d](https://github.com/electron-userland/electron-builder/commit/a25d04d5a8e58b447f0462673a4362414da9ed27))
+* fix the main matcher patterns for !node_modules/@test/xxxx ([#8547](https://github.com/electron-userland/electron-builder/issues/8547)) ([7488456](https://github.com/electron-userland/electron-builder/commit/7488456309d80b88fbf99fb382752078dc8ddefa))
+* pass in platform to electron-rebuild ([#8537](https://github.com/electron-userland/electron-builder/issues/8537)) ([2e84f01](https://github.com/electron-userland/electron-builder/commit/2e84f01351bcfb8f32df17c17bfeeeebb87a713f))
+* Path does not end with the package name  ([#8560](https://github.com/electron-userland/electron-builder/issues/8560)) ([4ff778e](https://github.com/electron-userland/electron-builder/commit/4ff778eefd9089b3b38b67156eb39e8cf57fdd83))
+* support including node_modules in other subdirectories ([#8562](https://github.com/electron-userland/electron-builder/issues/8562)) ([b8185d4](https://github.com/electron-userland/electron-builder/commit/b8185d48a75e65932196700e28bf71613dd141b4)), closes [/github.com/electron-userland/electron-builder/blob/e2c79819751454dbd1a939610d66e940b5dfb73d/packages/app-builder-lib/src/util/filter.ts#L60-L62](https://github.com//github.com/electron-userland/electron-builder/blob/e2c79819751454dbd1a939610d66e940b5dfb73d/packages/app-builder-lib/src/util/filter.ts/issues/L60-L62)
+* **updater:** Unable to copy file for caching: ENOENT ([#8541](https://github.com/electron-userland/electron-builder/issues/8541)) ([b6d6ea9](https://github.com/electron-userland/electron-builder/commit/b6d6ea993fd3b368d28786c259bb50486aaac417))
+
+
+### Features
+
+* allowing additional entries in .desktop file, such as `[Desktop Actions <actionName>]` ([#8572](https://github.com/electron-userland/electron-builder/issues/8572)) ([0dbe357](https://github.com/electron-userland/electron-builder/commit/0dbe357ac5b4f3c51d9a6e9d7bbf0b1f142b5746))
+* implement autoupdates for `pacman` ([#8394](https://github.com/electron-userland/electron-builder/issues/8394)) ([ae9221d](https://github.com/electron-userland/electron-builder/commit/ae9221d947c2dedff7b655ddafceb9746f9f4460))
+* migrate `electronDist` to be an electron-builder `Hook` ([#8525](https://github.com/electron-userland/electron-builder/issues/8525)) ([13f55a3](https://github.com/electron-userland/electron-builder/commit/13f55a3ef070d946f5d80dd412a557bd38c98424))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.6...v) (2024-10-06)
+
+
+### Bug Fixes
+
+* check if the file already starts with a UTF-8 BOM ([#8551](https://github.com/electron-userland/electron-builder/issues/8551)) ([57cebf4](https://github.com/electron-userland/electron-builder/commit/57cebf4dd4c722456245286d2fd795f7a5fc862c))
+* fix the main matcher patterns for !node_modules/@test/xxxx ([#8547](https://github.com/electron-userland/electron-builder/issues/8547)) ([7488456](https://github.com/electron-userland/electron-builder/commit/7488456309d80b88fbf99fb382752078dc8ddefa))
+* pass in platform to electron-rebuild ([#8537](https://github.com/electron-userland/electron-builder/issues/8537)) ([2e84f01](https://github.com/electron-userland/electron-builder/commit/2e84f01351bcfb8f32df17c17bfeeeebb87a713f))
+* Path does not end with the package name  ([#8560](https://github.com/electron-userland/electron-builder/issues/8560)) ([4ff778e](https://github.com/electron-userland/electron-builder/commit/4ff778eefd9089b3b38b67156eb39e8cf57fdd83))
+* **updater:** Unable to copy file for caching: ENOENT ([#8541](https://github.com/electron-userland/electron-builder/issues/8541)) ([b6d6ea9](https://github.com/electron-userland/electron-builder/commit/b6d6ea993fd3b368d28786c259bb50486aaac417))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.6...v) (2024-10-02)
+
+
+### Bug Fixes
+
+* check if the file already starts with a UTF-8 BOM ([#8551](https://github.com/electron-userland/electron-builder/issues/8551)) ([57cebf4](https://github.com/electron-userland/electron-builder/commit/57cebf4dd4c722456245286d2fd795f7a5fc862c))
+* fix the main matcher patterns for !node_modules/@test/xxxx ([#8547](https://github.com/electron-userland/electron-builder/issues/8547)) ([7488456](https://github.com/electron-userland/electron-builder/commit/7488456309d80b88fbf99fb382752078dc8ddefa))
+* pass in platform to electron-rebuild ([#8537](https://github.com/electron-userland/electron-builder/issues/8537)) ([2e84f01](https://github.com/electron-userland/electron-builder/commit/2e84f01351bcfb8f32df17c17bfeeeebb87a713f))
+* **updater:** Unable to copy file for caching: ENOENT ([#8541](https://github.com/electron-userland/electron-builder/issues/8541)) ([b6d6ea9](https://github.com/electron-userland/electron-builder/commit/b6d6ea993fd3b368d28786c259bb50486aaac417))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.5...v) (2024-09-25)
+
+
+### Bug Fixes
+
+* add `CodeSigningAccountName` as required prop in Azure Signing Options ([#8533](https://github.com/electron-userland/electron-builder/issues/8533)) ([cc8c70f](https://github.com/electron-userland/electron-builder/commit/cc8c70f7af5ca53b4c07b8ee32f460eabd4f9c34)), closes [/github.com/electron-userland/electron-builder/issues/8276#issuecomment-2371920176](https://github.com//github.com/electron-userland/electron-builder/issues/8276/issues/issuecomment-2371920176)
+* always produce Release .node builds ([#8531](https://github.com/electron-userland/electron-builder/issues/8531)) ([eaf274d](https://github.com/electron-userland/electron-builder/commit/eaf274d447d27d27a7ad663c5642a38d66f69917))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.4...v) (2024-09-23)
+
+
+### Bug Fixes
+
+* azure signing logic should not have logic flow dependent on custom signtool hook ([#8524](https://github.com/electron-userland/electron-builder/issues/8524)) ([62fd74d](https://github.com/electron-userland/electron-builder/commit/62fd74dcfa13a564706141d08e5d0dea11ecf33b))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.3...v) (2024-09-19)
+
+
+### Bug Fixes
+
+* **appx:** utilize `applicationId` verbatim when provided ([#8502](https://github.com/electron-userland/electron-builder/issues/8502)) ([4b2f693](https://github.com/electron-userland/electron-builder/commit/4b2f6937793a69fe15b35022e3ccca3be66b157d))
+* **deps:** update dependency @electron/notarize to v2.5.0 ([#8504](https://github.com/electron-userland/electron-builder/issues/8504)) ([59f6cb0](https://github.com/electron-userland/electron-builder/commit/59f6cb01945c27578052c0e81e588d5c8be459f8))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.2...v) (2024-09-17)
+
+
+### Bug Fixes
+
+* Fix issues with conflictDependency that have two or more layers ([#8481](https://github.com/electron-userland/electron-builder/issues/8481)) ([216eaf9](https://github.com/electron-userland/electron-builder/commit/216eaf935da870f0a1a1b14f2b852f879d467710))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.1.0...v) (2024-09-14)
+
+
+### Bug Fixes
+
+* **deploy:** redeploy all packages to sync semver ranges ([#8486](https://github.com/electron-userland/electron-builder/issues/8486)) ([d56cd27](https://github.com/electron-userland/electron-builder/commit/d56cd274b9d0fedb71889293164a15e51f7cc744))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.6...v) (2024-09-13)
+
+
+### Bug Fixes
+
+* checking extensions for `cjs` vs `mjs` while resolving config ([#8482](https://github.com/electron-userland/electron-builder/issues/8482)) ([ff8059e](https://github.com/electron-userland/electron-builder/commit/ff8059e385efbf017b9e325e4e7649b5cb6dff15))
+* correct native dependency tree mismatch in app-builder rebuild ([#8450](https://github.com/electron-userland/electron-builder/issues/8450)) ([55671bd](https://github.com/electron-userland/electron-builder/commit/55671bd2159d4da8934e7083077d9cc854dc85fb))
+* **deploy:** attempt to install deps before calculating publish changeset ([17310b4](https://github.com/electron-userland/electron-builder/commit/17310b4adbf241ff0869e5681e5b34f47ab1a3fb))
+* **deploy:** regenerate lockfile for test package ([#8484](https://github.com/electron-userland/electron-builder/issues/8484)) ([3faaa72](https://github.com/electron-userland/electron-builder/commit/3faaa72550fa15dab60112291aacb9fbe7c3d1d1))
+
+
+### Features
+
+* **win:** implement Azure Trusted Signing ([#8458](https://github.com/electron-userland/electron-builder/issues/8458)) ([d50d563](https://github.com/electron-userland/electron-builder/commit/d50d563408c117f82863d0611311226d53ef6e8e))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.6...v) (2024-09-13)
+
+
+### Bug Fixes
+
+* correct native dependency tree mismatch in app-builder rebuild ([#8450](https://github.com/electron-userland/electron-builder/issues/8450)) ([55671bd](https://github.com/electron-userland/electron-builder/commit/55671bd2159d4da8934e7083077d9cc854dc85fb))
+
+
+### Features
+
+* **win:** implement Azure Trusted Signing ([#8458](https://github.com/electron-userland/electron-builder/issues/8458)) ([d50d563](https://github.com/electron-userland/electron-builder/commit/d50d563408c117f82863d0611311226d53ef6e8e))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.5...v) (2024-09-08)
+
+
+### Bug Fixes
+
+* enable usage of config files when package.json `type=module` ([#8455](https://github.com/electron-userland/electron-builder/issues/8455)) ([5c8373d](https://github.com/electron-userland/electron-builder/commit/5c8373d15f99ee9a4c46ed164f95bf1d4a11db28))
+* retry renaming update file when EBUSY error occurs due to file lock ([#8437](https://github.com/electron-userland/electron-builder/issues/8437)) ([be625e0](https://github.com/electron-userland/electron-builder/commit/be625e06273e56de09ed3298209858043fcd1151))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.4...v) (2024-08-20)
+
+
+### Bug Fixes
+
+* change `abort` listener to `aborted` event ([#8282](https://github.com/electron-userland/electron-builder/issues/8282)) ([15ce5b4](https://github.com/electron-userland/electron-builder/commit/15ce5b4164378f7398ff84cabe8ee97eef5cfd1b))
+* Snap publish regression ([#8424](https://github.com/electron-userland/electron-builder/issues/8424)) ([8e6c171](https://github.com/electron-userland/electron-builder/commit/8e6c17124cdc523620a66efaf871ef8d335c0f49))
+* windows signature verification special chars ([#8409](https://github.com/electron-userland/electron-builder/issues/8409)) ([5fae1cf](https://github.com/electron-userland/electron-builder/commit/5fae1cf3be0388c2bd95a341a0340faa839d2aa7)), closes [#8051](https://github.com/electron-userland/electron-builder/issues/8051) [#8162](https://github.com/electron-userland/electron-builder/issues/8162) [#8162](https://github.com/electron-userland/electron-builder/issues/8162)
+
+
+### Features
+
+* allow `riscv64` support via custom electron dist ([#8143](https://github.com/electron-userland/electron-builder/issues/8143)) ([b306895](https://github.com/electron-userland/electron-builder/commit/b3068954d946be5fe2568183819a26c36d54878b))
+
+
+### Reverts
+
+* Revert "feat: allow `riscv64` support via custom electron dist (#8143)" (#8427) ([de1ea75](https://github.com/electron-userland/electron-builder/commit/de1ea759d3f4914c296d4512b4dec7a066ff40ec)), closes [#8143](https://github.com/electron-userland/electron-builder/issues/8143) [#8427](https://github.com/electron-userland/electron-builder/issues/8427)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.3...v) (2024-08-11)
+
+
+### Bug Fixes
+
+* add `disableDefaultIgnoredFiles` option ([#8398](https://github.com/electron-userland/electron-builder/issues/8398)) ([5ab2bee](https://github.com/electron-userland/electron-builder/commit/5ab2bee1e1db77967c65d56443f0dc79de5071da))
+* add custom `channel` in github provider ([#8393](https://github.com/electron-userland/electron-builder/issues/8393)) ([8dabf64](https://github.com/electron-userland/electron-builder/commit/8dabf64b8f84975cf4eb016dcd23411ab0d4bf64))
+* broken link formatting in the docs ([#8407](https://github.com/electron-userland/electron-builder/issues/8407)) ([6cc6b8d](https://github.com/electron-userland/electron-builder/commit/6cc6b8deb4c7682d3c4cc9e450572dd7a135f8ae))
+* **electron-updater,deb:** Handle spaces in application artifact name for deb ([#8400](https://github.com/electron-userland/electron-builder/issues/8400)) ([9dc0b49](https://github.com/electron-userland/electron-builder/commit/9dc0b49aea1d3bb56b42c3b1bdb6001708a34439))
+* handle spaces in artifact name for all linux platforms instead of only .deb ([#8403](https://github.com/electron-userland/electron-builder/issues/8403)) ([1c14820](https://github.com/electron-userland/electron-builder/commit/1c14820b97fad802b300dd93ccd4d6a10a72360f))
+* return parent dir for local dependency ([#8406](https://github.com/electron-userland/electron-builder/issues/8406)) ([f7daeb9](https://github.com/electron-userland/electron-builder/commit/f7daeb9976353f7b12c093c88b6e1136b6317880))
+
+
+### Features
+
+* always unpack native node files ([#8392](https://github.com/electron-userland/electron-builder/issues/8392)) ([12c52a8](https://github.com/electron-userland/electron-builder/commit/12c52a81420f04ec0e205dd83798c2b0b773011d))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.2...v) (2024-07-31)
+
+
+### Bug Fixes
+
+* delete the file symlink when the target is empty ([#8371](https://github.com/electron-userland/electron-builder/issues/8371)) ([afd8132](https://github.com/electron-userland/electron-builder/commit/afd813265d346b7bddba7ea63563c876f630088e))
+* **updater:** Add global download promise to limit concurrent update downloads to 1 ([#8378](https://github.com/electron-userland/electron-builder/issues/8378)) ([c8fe146](https://github.com/electron-userland/electron-builder/commit/c8fe1462d529edeed0ad3fe0b7e99e8af1ca61ac))
+* upgrade app-builder-bin version (with downgraded appimage tool) ([#8387](https://github.com/electron-userland/electron-builder/issues/8387)) ([553c737](https://github.com/electron-userland/electron-builder/commit/553c737b2cf1ad835690f7db3c1907ae88944d15))
+* **windows,code-sign:** cannot sign binary files in Github Actions ([#8384](https://github.com/electron-userland/electron-builder/issues/8384)) ([f8fbdd1](https://github.com/electron-userland/electron-builder/commit/f8fbdd122ecdc7a967f3fbeef3572dfd133cc5e3)), closes [#7729](https://github.com/electron-userland/electron-builder/issues/7729) [#8055](https://github.com/electron-userland/electron-builder/issues/8055)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.1...v) (2024-07-23)
+
+
+### Bug Fixes
+
+* adding additional logging when importing/requiring a module in case the hook script is invalid or unable to be executed ([#8356](https://github.com/electron-userland/electron-builder/issues/8356)) ([2541eb6](https://github.com/electron-userland/electron-builder/commit/2541eb62a6a8338c87f3d032ff48ed154c2d3cca))
+* allow typescript typechecking for electron-updater `.d.ts` ([#8372](https://github.com/electron-userland/electron-builder/issues/8372)) ([c85b73d](https://github.com/electron-userland/electron-builder/commit/c85b73d7c8dcefe86b0b350946af1cea951e6aae))
+* checking cancellation token during pack and any retry tasks to exit early on process "cancel" ([#8375](https://github.com/electron-userland/electron-builder/issues/8375)) ([54c1059](https://github.com/electron-userland/electron-builder/commit/54c1059b961f7c2a493d26b7e6ef674911069cad))
+* **docs): Revert "chore(deps:** update dependency mkdocs to <1.7 ([#8350](https://github.com/electron-userland/electron-builder/issues/8350))" ([#8366](https://github.com/electron-userland/electron-builder/issues/8366)) ([30baa4f](https://github.com/electron-userland/electron-builder/commit/30baa4fe8ddc4c992eafadfb45a16cbd2f7907af))
+* **linux:** Don't setuid chrome-sandbox when not required ([#8368](https://github.com/electron-userland/electron-builder/issues/8368)) ([2acdf65](https://github.com/electron-userland/electron-builder/commit/2acdf65d47ad4b8fb546a00833d646a5e58e5428))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0...v) (2024-07-18)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @electron/osx-sign to v1.3.1 ([#8341](https://github.com/electron-userland/electron-builder/issues/8341)) ([578a7e1](https://github.com/electron-userland/electron-builder/commit/578a7e1a0fcf2a700fe5fadcb1567c1193bd978d))
+* resolve CI flakiness due to lzma-native dependency ([#8342](https://github.com/electron-userland/electron-builder/issues/8342)) ([60774a3](https://github.com/electron-userland/electron-builder/commit/60774a3883d021f27ecce7a37608f025f1a80ce3))
+* setting `disablePreGypCopy: true` and updating unit test with `node-pty` native module ([#8352](https://github.com/electron-userland/electron-builder/issues/8352)) ([372b046](https://github.com/electron-userland/electron-builder/commit/372b046bec23ba0390a6cdb3b4390f033796c833))
+* updating app-builder dependency ([#8353](https://github.com/electron-userland/electron-builder/issues/8353)) ([089dd63](https://github.com/electron-userland/electron-builder/commit/089dd6396c9638910967c1968d9b8056acd952a9))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.13...v) (2024-07-15)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.12...v) (2024-07-12)
+
+
+### Bug Fixes
+
+* binary checking for unpacked assets ([#8310](https://github.com/electron-userland/electron-builder/issues/8310)) ([145ecb6](https://github.com/electron-userland/electron-builder/commit/145ecb66baabd39ca523ebbba26ef484384fe8e7))
+* **deps:** update dependency minimatch to v10 ([#8327](https://github.com/electron-userland/electron-builder/issues/8327)) ([f9eae65](https://github.com/electron-userland/electron-builder/commit/f9eae653985f332ead7545490c73aa27d90c35cd))
+* **deps:** update dependency read-config-file to v6.4.0 ([#8324](https://github.com/electron-userland/electron-builder/issues/8324)) ([1f1f92c](https://github.com/electron-userland/electron-builder/commit/1f1f92c978acfde789abd740086be2e6398fe5e6))
+* Modify the import method of the builder-util package ([#8330](https://github.com/electron-userland/electron-builder/issues/8330)) ([db1894d](https://github.com/electron-userland/electron-builder/commit/db1894d78a0bbf8377a787a25dddc17af22a4667))
+* Nsis license file encode issue ([#8314](https://github.com/electron-userland/electron-builder/issues/8314)) ([1337f15](https://github.com/electron-userland/electron-builder/commit/1337f158c93d4c83ebaefb20833811fd90f05f16))
+* **rpm-updater:** stop uninstalling app before update ([#8311](https://github.com/electron-userland/electron-builder/issues/8311)) ([35a0784](https://github.com/electron-userland/electron-builder/commit/35a0784eb4cffc2fcbf33ec58fefbacf8e8e5125)), closes [#8305](https://github.com/electron-userland/electron-builder/issues/8305)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.11...v) (2024-07-10)
+
+
+### Bug Fixes
+
+* add `MemoLazy` class to fix `codeSigningInfo` and `cscInfo` not responding to changed args ([#8291](https://github.com/electron-userland/electron-builder/issues/8291)) ([ad668ae](https://github.com/electron-userland/electron-builder/commit/ad668ae14ef60fb91dd74aa71562f2fd68fbaa48))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.10...v) (2024-07-05)
+
+
+### Bug Fixes
+
+* **deploy:** using `pnpm publish` cmd line arg to force `next` tag ([#8285](https://github.com/electron-userland/electron-builder/issues/8285)) ([81da7c1](https://github.com/electron-userland/electron-builder/commit/81da7c1491e2b3ff2f7b476f8128183f57074ff5))
+* Folder's named "constructor" not being included in asar  ([#8286](https://github.com/electron-userland/electron-builder/issues/8286)) ([4a4023c](https://github.com/electron-userland/electron-builder/commit/4a4023c3661b9e190e526965b894f90bdcea87ab))
+* verify LiteralPath of update file during windows signature verification ([#8295](https://github.com/electron-userland/electron-builder/issues/8295)) ([ac2e6a2](https://github.com/electron-userland/electron-builder/commit/ac2e6a25aa491c1ef5167a552c19fc2085cd427f))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.9...v) (2024-06-29)
+
+
+### Bug Fixes
+
+* @electron/remote wrongly into Windows app.asar ([#8254](https://github.com/electron-userland/electron-builder/issues/8254)) ([dc5d7c8](https://github.com/electron-userland/electron-builder/commit/dc5d7c8dafd4aca7192d05b2978c3e66f30e38f3))
+* **docs:** fix typo in default glob pattern ([#8256](https://github.com/electron-userland/electron-builder/issues/8256)) ([14942b7](https://github.com/electron-userland/electron-builder/commit/14942b70a5da79a5e36e330f64de66ec501b4ac6))
+* don't log ignored error when requiring custom publisher ([#8267](https://github.com/electron-userland/electron-builder/issues/8267)) ([9d55973](https://github.com/electron-userland/electron-builder/commit/9d55973879a045111c986ddb27b37f3c1fb5a0c0))
+* **refactor:** builder-util-runtime, separate newError to eliminate circular dependency ([#8251](https://github.com/electron-userland/electron-builder/issues/8251)) ([140e2f0](https://github.com/electron-userland/electron-builder/commit/140e2f0eb0df79c2a46e35024e96d0563355fc89))
+* resolve CI/CD docs generation issue ([#8281](https://github.com/electron-userland/electron-builder/issues/8281)) ([9a0b3c6](https://github.com/electron-userland/electron-builder/commit/9a0b3c6e0201ba32c26b2f96e2e9abf7af2ef666))
+
+
+### Features
+
+* **appx:** Update `identityName` for windows 10 ([#8206](https://github.com/electron-userland/electron-builder/issues/8206)) ([51111a8](https://github.com/electron-userland/electron-builder/commit/51111a87a541ccf826dcd11393b4b3a0e83ca368))
+* **deps:** updating app-builder to v5.0.0-alpha.4 ([#8274](https://github.com/electron-userland/electron-builder/issues/8274)) ([88bbbdb](https://github.com/electron-userland/electron-builder/commit/88bbbdbe81936df1701f26138170e0f337c4f0d4))
+* write asar integrity resource on windows ([#8245](https://github.com/electron-userland/electron-builder/issues/8245)) ([13e0e0d](https://github.com/electron-userland/electron-builder/commit/13e0e0d2a272e6111024a28e1c3619dd1769366c))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.8...v) (2024-06-02)
+
+
+### Bug Fixes
+
+* **deps:** update dependency ejs to v3.1.10 [security] ([#8192](https://github.com/electron-userland/electron-builder/issues/8192)) ([77f9774](https://github.com/electron-userland/electron-builder/commit/77f977435c99247d5db395895618b150f5006e8f))
+* **docs:** update autoupdate docs noting that `channels` work with Github ([#8227](https://github.com/electron-userland/electron-builder/issues/8227)) ([48c5953](https://github.com/electron-userland/electron-builder/commit/48c59535f84cd16fb2e44d71f6b75c25c739b993))
+
+
+### Features
+
+* update app-builder-bin to 5.0-alpha release ([#8190](https://github.com/electron-userland/electron-builder/issues/8190)) ([503da26](https://github.com/electron-userland/electron-builder/commit/503da26f1ef71bff19bd173bdce4052c48ddc5cc))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.7...v) (2024-05-20)
+
+
+### Bug Fixes
+
+* **deps:** update dependency tar to v6.2.1 [security] ([#8171](https://github.com/electron-userland/electron-builder/issues/8171)) ([393f140](https://github.com/electron-userland/electron-builder/commit/393f140459dc4a7d6008750dc48de83c8e8d33a7))
+
+
+### Features
+
+* add `afterExtract` hook for after electron distributable has been unpacked ([#8194](https://github.com/electron-userland/electron-builder/issues/8194)) ([588c5db](https://github.com/electron-userland/electron-builder/commit/588c5db47c97e06b540bdc7f7a6de9a936a7603b))
+* **mac:** support macos signature `additionalArguments` parameter  ([#8218](https://github.com/electron-userland/electron-builder/issues/8218)) ([22737b2](https://github.com/electron-userland/electron-builder/commit/22737b2b2db5a10785b1ed3fd05fd9d237fcd731))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.6...v) (2024-05-06)
+
+
+### Bug Fixes
+
+* **appx:** Update `identityName` validation for windows 10 ([#8203](https://github.com/electron-userland/electron-builder/issues/8203)) ([66d6d6c](https://github.com/electron-userland/electron-builder/commit/66d6d6c73776b8a62ec30d569bf68c0f1eb83ce2))
+* disable broken test, needs further debugging. It's broken on all previous versions of electron-builder, seems MacOS related ([ac6d887](https://github.com/electron-userland/electron-builder/commit/ac6d8875463cba89c02a35baf347a1c2f76697e9))
+* disable broken test, needs further debugging. It's broken on all previous versions of electron-builder, seems MacOS related ([01a9c08](https://github.com/electron-userland/electron-builder/commit/01a9c08f2ddbd8d1b96c58089771a93fd695c753))
+* disable broken test, needs further debugging. It's broken on all previous versions of electron-builder, seems MacOS related ([dbd1fc5](https://github.com/electron-userland/electron-builder/commit/dbd1fc5510dca1da90a199fb34407573e464dba3))
+* **docs/multi-platform-build.md:** broken link of build.sh ([#8193](https://github.com/electron-userland/electron-builder/issues/8193)) ([3a2ccdd](https://github.com/electron-userland/electron-builder/commit/3a2ccdd9483afa3134198b3ef56ba6163b2aaec9))
+* treat cscLink empty string same as absent ([#8185](https://github.com/electron-userland/electron-builder/issues/8185)) ([5e41c5e](https://github.com/electron-userland/electron-builder/commit/5e41c5e8e440f7c6d139fc0e311efa46bc2846c3))
+
+
+### Features
+
+* Add Support for a separate Github release token to the auto-update token ([#8173](https://github.com/electron-userland/electron-builder/issues/8173)) ([3ae3589](https://github.com/electron-userland/electron-builder/commit/3ae3589a63c2d915b8456d9dc81a965a1366c73b))
+* **linux:** add music mac to linux category ([#8182](https://github.com/electron-userland/electron-builder/issues/8182)) ([b43490a](https://github.com/electron-userland/electron-builder/commit/b43490a274722aba398594bcf0156d1b3687e0d2))
+
+
+### Reverts
+
+* Revert "fix(appx): Update `identityName` validation for windows 10 (#8203)" (#8205) ([48e6b14](https://github.com/electron-userland/electron-builder/commit/48e6b14b767817f20af47df568423765cc5421d0)), closes [#8203](https://github.com/electron-userland/electron-builder/issues/8203) [#8205](https://github.com/electron-userland/electron-builder/issues/8205)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.5...v) (2024-04-03)
+
+
+### Bug Fixes
+
+* do not chmod for 7za when `process.env.USE_SYSTEM_7ZA` is true ([#8152](https://github.com/electron-userland/electron-builder/issues/8152)) ([a999da4](https://github.com/electron-userland/electron-builder/commit/a999da48480b5024d97c3028a655bb33b00fc3bc))
+
+
+### Features
+
+* Add CLI and API for only publishing assets (skipping `build` flow) ([#8150](https://github.com/electron-userland/electron-builder/issues/8150)) ([f4e6ae2](https://github.com/electron-userland/electron-builder/commit/f4e6ae2931cbf79670b5f2c252a91bed03d96546))
+* add config options for setting `MinVersion` and `MaxVersionTested` fields in appx manifest ([#8142](https://github.com/electron-userland/electron-builder/issues/8142)) ([8160363](https://github.com/electron-userland/electron-builder/commit/8160363ac2821242ab22e225a9038b56e4798cc6))
+* export Packager sub-classes from main electron-builder types ([#8153](https://github.com/electron-userland/electron-builder/issues/8153)) ([8e36be1](https://github.com/electron-userland/electron-builder/commit/8e36be113489c1afa6ce5ee6cdda73049bc619a6))
+* Make notarization with Apple ID more usable (`altool` is no longer supported) ([#8159](https://github.com/electron-userland/electron-builder/issues/8159)) ([15bffa0](https://github.com/electron-userland/electron-builder/commit/15bffa00d429d9f333b737712fb3a13f5d26ea53))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.4...v) (2024-03-18)
+
+
+### Bug Fixes
+
+* update autoupdate docs to describe module-based support. set `nativeRebuilder` default value to use electron/rebuild ([#8140](https://github.com/electron-userland/electron-builder/issues/8140)) ([99a6150](https://github.com/electron-userland/electron-builder/commit/99a6150ea02c91a7e7e657c667328eb734e29b8f))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.3...v) (2024-03-15)
+
+
+### Bug Fixes
+
+* attempting to wrap all `hdiutil`'s in a common retry mechanism for CI stability ([#8135](https://github.com/electron-userland/electron-builder/issues/8135)) ([c2392de](https://github.com/electron-userland/electron-builder/commit/c2392de71a8f7abc092a00452eac63dd24b34e88))
+* **nsis:** replace `SYSTEMROOT` with `SYSDIR` ([#8133](https://github.com/electron-userland/electron-builder/issues/8133)) ([44b0446](https://github.com/electron-userland/electron-builder/commit/44b04463bf581b4c013586c9010733b518a802a4))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.2...v) (2024-03-12)
+
+
+### Bug Fixes
+
+* order files in asar for optimized differential updates ([#8128](https://github.com/electron-userland/electron-builder/issues/8128)) ([555dc90](https://github.com/electron-userland/electron-builder/commit/555dc909a97cbaab5bc5df6cdf6f1176dff1e604))
+* **win:** use appInfo `description` as primary entry for `FileDescription` ([#8125](https://github.com/electron-userland/electron-builder/issues/8125)) ([c6c9d59](https://github.com/electron-userland/electron-builder/commit/c6c9d59e4cc8444ab847a14bf64364b065a384ee))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v25.0.0-alpha.1...v) (2024-03-11)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @electron/notarize to v2.3.0 ([#8114](https://github.com/electron-userland/electron-builder/issues/8114)) ([0e8e7f6](https://github.com/electron-userland/electron-builder/commit/0e8e7f6524f0f00b28348fc47c57db8f801692b1))
+* **deps:** update dependency @electron/universal to v2 ([#8115](https://github.com/electron-userland/electron-builder/issues/8115)) ([f8602aa](https://github.com/electron-userland/electron-builder/commit/f8602aa222ad8b85eb0b91a11f359580203ba024))
+* move `disableSanityCheckAsar` to within `checkFileInPackage` for non-asar verification ([#8124](https://github.com/electron-userland/electron-builder/issues/8124)) ([e029258](https://github.com/electron-userland/electron-builder/commit/e02925818258954747188a5eb2ece5047452b89a))
+
+
+### Features
+
+* add disableSanityCheckPackage to asar to allow custom electron fork asar integrity implementations ([#8123](https://github.com/electron-userland/electron-builder/issues/8123)) ([031d7d5](https://github.com/electron-userland/electron-builder/commit/031d7d5bdf911cb6dc4b0b108f82df44f4c2b224))
+* support additionalLightArgs for msi target ([#8120](https://github.com/electron-userland/electron-builder/issues/8120)) ([00f46e6](https://github.com/electron-userland/electron-builder/commit/00f46e6f60a8a762a2094264c2f2473f0a6334be))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.4-alpha.0...v) (2024-03-09)
+
+
+### Features
+
+* add minimumSystemVersion in electron updater ([#8108](https://github.com/electron-userland/electron-builder/issues/8108)) ([3d4cc7a](https://github.com/electron-userland/electron-builder/commit/3d4cc7ae01c4f6154d6ea59726578b1ff99b9daf))
+* yarn 3 support for native modules via new electron/rebuild compilation ([#8112](https://github.com/electron-userland/electron-builder/issues/8112)) ([9edfee6](https://github.com/electron-userland/electron-builder/commit/9edfee6da2de0cfedafebceef0dbfea1a0a17644))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.3...v) (2024-03-08)
+
+
+### Bug Fixes
+
+* mac differential updater ([#8095](https://github.com/electron-userland/electron-builder/issues/8095)) ([53cec79](https://github.com/electron-userland/electron-builder/commit/53cec79bdc3f56c9371bdfb7901e97650d9ac4bc))
+* **mac:** add retry in mac code sign ([#8101](https://github.com/electron-userland/electron-builder/issues/8101)) ([9bcede8](https://github.com/electron-userland/electron-builder/commit/9bcede88f2083d41266e48dfa712adc2d223bd7f))
+* **mac:** revert mac differential autoupdate ([#8091](https://github.com/electron-userland/electron-builder/issues/8091)) ([e2a181d](https://github.com/electron-userland/electron-builder/commit/e2a181d9fe3fbdd84690359e275daaef24584729)), closes [#7709](https://github.com/electron-userland/electron-builder/issues/7709)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.3...v) (2024-03-03)
+
+
+### Bug Fixes
+
+* **mac:** revert mac differential autoupdate ([#8091](https://github.com/electron-userland/electron-builder/issues/8091)) ([e2a181d](https://github.com/electron-userland/electron-builder/commit/e2a181d9fe3fbdd84690359e275daaef24584729)), closes [#7709](https://github.com/electron-userland/electron-builder/issues/7709)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.2...v) (2024-03-02)
+
+
+### Bug Fixes
+
+* **deb:** only execute `update-desktop-database` and `update-mime-database` when exists on the system ([#8067](https://github.com/electron-userland/electron-builder/issues/8067)) ([18340ee](https://github.com/electron-userland/electron-builder/commit/18340eef6d8e9ee6efbf528508bac7972168bedb))
+* **mac:** signing NSIS on mac  ([#8090](https://github.com/electron-userland/electron-builder/issues/8090)) ([2c147ad](https://github.com/electron-userland/electron-builder/commit/2c147addb09385008cf661c952e7ce390a254d8e))
+
+
+### Features
+
+* add support for differential zip updates on macOS ([#7709](https://github.com/electron-userland/electron-builder/issues/7709)) ([79df542](https://github.com/electron-userland/electron-builder/commit/79df54238621fbe48ba20444129950ba2dc49983))
+* **msi:** build emulated arm64 MSI installers ([#8086](https://github.com/electron-userland/electron-builder/issues/8086)) ([e6f1beb](https://github.com/electron-userland/electron-builder/commit/e6f1bebd96cbc54f7455cd9bd48bb1eadc5648f5)), closes [#6077](https://github.com/electron-userland/electron-builder/issues/6077)
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.1...v) (2024-02-22)
+
+
+### Bug Fixes
+
+* execute `%SYSTEMROOT%` cmd.exe directly during NSIS installer ([#8059](https://github.com/electron-userland/electron-builder/issues/8059)) ([8f4acff](https://github.com/electron-userland/electron-builder/commit/8f4acff3c2d45c1cb07779bb3fe79644408ee387))
+* **mac:** only skip notarization step when `notarize` is explicitly false ([#8065](https://github.com/electron-userland/electron-builder/issues/8065)) ([5681777](https://github.com/electron-userland/electron-builder/commit/5681777a808d49756f3a95d18cc589218be44878))
+* **pkg:** provide `BundlePreInstallScriptPath` and/or `BundlePostInstallScriptPath` when a pre/postinstall script is provided to pkg installer ([#8071](https://github.com/electron-userland/electron-builder/issues/8071)) ([eb296c9](https://github.com/electron-userland/electron-builder/commit/eb296c9b2afd77db799eadd472f9ec22f6fc4354))
+* use `pathToFileUrl` for hooks for Windows ES module support ([#8069](https://github.com/electron-userland/electron-builder/issues/8069)) ([538dd86](https://github.com/electron-userland/electron-builder/commit/538dd86bf52f0091dbb1120bdd30f56dfdbd5747))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.13.0...v) (2024-02-17)
+
+
+### Bug Fixes
+
+* add dmg-builder and squirrel-windows to peerDependencies for pnpm ([#8052](https://github.com/electron-userland/electron-builder/issues/8052)) ([6a4f605](https://github.com/electron-userland/electron-builder/commit/6a4f605f9ae1a1de02a8260ffe054f74fbd097a5))
+* auto-update powershell script requires reset of `PSModulePath` ([#8051](https://github.com/electron-userland/electron-builder/issues/8051)) ([48603ba](https://github.com/electron-userland/electron-builder/commit/48603ba09dc7103849a2975799c19068fd08fc07))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.12.0...v) (2024-02-09)
+
+
+### Bug Fixes
+
+* Attempt dynamically importing hook as a module if package.json `type=module`, if fail, fallback to default `require` ([#8042](https://github.com/electron-userland/electron-builder/issues/8042)) ([63a0044](https://github.com/electron-userland/electron-builder/commit/63a00443cf4bae9d7406f7e879ea607632da08b8))
+* **deps:** update dependency @electron/notarize to v2.2.1 ([#8029](https://github.com/electron-userland/electron-builder/issues/8029)) ([2248134](https://github.com/electron-userland/electron-builder/commit/2248134068e035ec76fe696385bb467a94dd384d))
+* **deps:** update dependency @electron/universal to v1.5.1 ([#8030](https://github.com/electron-userland/electron-builder/issues/8030)) ([db3b18e](https://github.com/electron-userland/electron-builder/commit/db3b18e799a6579bbc36c41b3125a062ebf075ec))
+* **mac:** merge `fileAssociations` with existing `CFBundleDocumentTypes` if defined in `mac.extendInfo` ([#8035](https://github.com/electron-userland/electron-builder/issues/8035)) ([94677f3](https://github.com/electron-userland/electron-builder/commit/94677f3d70866582635c717b042194f0c75bbf01))
+* **mac:** Update mac notarize keychain env var to be optional. Fixes: [#8015](https://github.com/electron-userland/electron-builder/issues/8015) ([#8022](https://github.com/electron-userland/electron-builder/issues/8022)) ([9d1d150](https://github.com/electron-userland/electron-builder/commit/9d1d150896a763d3630418bf5be8fd3a070c0c40))
+* use CI_COMMIT_TAG instead of CI_BUILD_TAG for Gitlab CI ([#8010](https://github.com/electron-userland/electron-builder/issues/8010)) ([f5340b7](https://github.com/electron-userland/electron-builder/commit/f5340b732dc0a303743a2a924750e9861e3a345f))
+
+
+### Features
+
+* allow `onNodeModuleFile` to return a boolean to force include the package to be copied ([#8043](https://github.com/electron-userland/electron-builder/issues/8043)) ([bb4a8c0](https://github.com/electron-userland/electron-builder/commit/bb4a8c09318045938bfff5a0d1db8f17f0fa4e8c))
+
+
+
+# [](https://github.com/electron-userland/electron-builder/compare/v24.11.0...v) (2024-01-23)
+
+
+### Bug Fixes
+
+* **linux:** Use ~ as pre-release separator for deb targets ([#7978](https://github.com/electron-userland/electron-builder/issues/7978)) ([2773410](https://github.com/electron-userland/electron-builder/commit/277341000a87abaa65a7985854c06e88ed5938b9))
+* Use fully-defined path `/usr/bin/___` to macOS signing utilities ([#7998](https://github.com/electron-userland/electron-builder/issues/7998)) ([61dfe7f](https://github.com/electron-userland/electron-builder/commit/61dfe7fbaa592785353348a16abd1525dcbfaf28))
+
+
+### Features
+
+* **mac:** Add support for a custom 'sign' function in mac/mas config ([#8002](https://github.com/electron-userland/electron-builder/issues/8002)) ([adf97dc](https://github.com/electron-userland/electron-builder/commit/adf97dccd0146288ab482a261b749d67a458868a))
+
+
+
 # [](https://github.com/electron-userland/electron-builder/compare/v24.10.0...v) (2024-01-09)
 
 

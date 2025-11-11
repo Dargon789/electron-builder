@@ -1,5 +1,5 @@
 import { appBuilderPath } from "app-builder-bin"
-import { safeStringifyJson } from "builder-util-runtime"
+import { retry, Nullish, safeStringifyJson } from "builder-util-runtime"
 import * as chalk from "chalk"
 import { ChildProcess, execFile, ExecFileOptions, SpawnOptions } from "child_process"
 import { spawn as _spawn } from "cross-spawn"
@@ -7,27 +7,30 @@ import { createHash } from "crypto"
 import _debug from "debug"
 import { dump } from "js-yaml"
 import * as path from "path"
-import { debug, log } from "./log"
 import { install as installSourceMap } from "source-map-support"
 import { getPath7za } from "./7za"
+import { debug, log } from "./log"
 
 if (process.env.JEST_WORKER_ID == null) {
   installSourceMap()
 }
 
-export { safeStringifyJson } from "builder-util-runtime"
+export { safeStringifyJson, retry } from "builder-util-runtime"
 export { TmpDir } from "temp-file"
-export { log, debug } from "./log"
-export { Arch, getArchCliNames, toLinuxArchString, getArchSuffix, ArchType, archFromString, defaultArchFromString } from "./arch"
+export * from "./arch"
+export { Arch, archFromString, ArchType, defaultArchFromString, getArchCliNames, getArchSuffix, toLinuxArchString } from "./arch"
 export { AsyncTaskManager } from "./asyncTaskManager"
 export { DebugLogger } from "./DebugLogger"
+export * from "./log"
+export { httpExecutor, NodeHttpExecutor } from "./nodeHttpExecutor"
+export * from "./promise"
 
-export { copyFile, exists } from "./fs"
 export { asArray } from "builder-util-runtime"
+export * from "./fs"
 
 export { deepAssign } from "./deepAssign"
 
-export { getPath7za, getPath7x } from "./7za"
+export { getPath7x, getPath7za } from "./7za"
 
 export const debug7z = _debug("electron-builder:7z")
 
@@ -39,17 +42,33 @@ export function serializeToYaml(object: any, skipInvalid = false, noRefs = false
   })
 }
 
-export function removePassword(input: string) {
-  return input.replace(/(-String |-P |pass:| \/p |-pass |--secretKey |--accessKey |-p )([^ ]+)/g, (match, p1, p2) => {
-    if (p1.trim() === "/p" && p2.startsWith("\\\\Mac\\Host\\\\")) {
-      // appx /p
-      return `${p1}${p2}`
+export function removePassword(input: string): string {
+  const blockList = ["--accessKey", "--secretKey", "-P", "-p", "-pass", "-String", "/p", "pass:"]
+
+  // Create a regex pattern that supports:
+  //   - space-separated unquoted values: --key value
+  //   - quoted values: --key "value with spaces" or 'value with spaces'
+  const blockPattern = new RegExp(`(${blockList.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*(?:(["'])(.*?)\\2|([^\\s]+))`, "g")
+
+  input = input.replace(blockPattern, (_match, prefix, quote, quotedVal, unquotedVal) => {
+    const value = quotedVal ?? unquotedVal
+
+    if (prefix.trim() === "/p" && value.startsWith("\\\\Mac\\Host\\\\")) {
+      return `${prefix} ${quote ?? ""}${value}${quote ?? ""}`
     }
-    return `${p1}${createHash("sha256").update(p2).digest("hex")} (sha256 hash)`
+
+    const hashed = createHash("sha256").update(value).digest("hex")
+    return `${prefix} ${quote ?? ""}${hashed} (sha256 hash)${quote ?? ""}`
+  })
+
+  // Also handle `/b ... /c` block format
+  return input.replace(/(\/b\s+)(.*?)(\s+\/c)/g, (_match, p1, p2, p3) => {
+    const hashed = createHash("sha256").update(p2).digest("hex")
+    return `${p1}${hashed} (sha256 hash)${p3}`
   })
 }
 
-function getProcessEnv(env: { [key: string]: string | undefined } | undefined | null): NodeJS.ProcessEnv | undefined {
+function getProcessEnv(env: Record<string, string | undefined> | Nullish): NodeJS.ProcessEnv | undefined {
   if (process.platform === "win32") {
     return env == null ? undefined : env
   }
@@ -132,7 +151,8 @@ export function exec(file: string, args?: Array<string> | null, options?: ExecFi
             message += `\n${chalk.red(stderr.toString())}`
           }
 
-          reject(new Error(message))
+          // TODO: switch to ECMA Script 2026 Error class with `cause` property to return stack trace
+          reject(new ExecError(file, (error as any).code, message, "", `${error.code || ExecError.code}`))
         }
       }
     )
@@ -261,18 +281,25 @@ function formatOut(text: string, title: string) {
 export class ExecError extends Error {
   alreadyLogged = false
 
-  constructor(command: string, readonly exitCode: number, out: string, errorOut: string, code = "ERR_ELECTRON_BUILDER_CANNOT_EXECUTE") {
+  static code = "ERR_ELECTRON_BUILDER_CANNOT_EXECUTE"
+
+  constructor(
+    command: string,
+    readonly exitCode: number,
+    out: string,
+    errorOut: string,
+    code = ExecError.code
+  ) {
     super(`${command} process failed ${code}${formatOut(String(exitCode), "Exit code")}${formatOut(out, "Output")}${formatOut(errorOut, "Error output")}`)
     ;(this as NodeJS.ErrnoException).code = code
   }
 }
 
-type Nullish = null | undefined
 export function use<T, R>(value: T | Nullish, task: (value: T) => R): R | null {
   return value == null ? null : task(value)
 }
 
-export function isEmptyOrSpaces(s: string | null | undefined): s is "" | null | undefined {
+export function isEmptyOrSpaces(s: string | Nullish): s is "" | Nullish {
   return s == null || s.trim().length === 0
 }
 
@@ -289,7 +316,7 @@ export function addValue<K, T>(map: Map<K, Array<T>>, key: K, value: T) {
   }
 }
 
-export function replaceDefault(inList: Array<string> | null | undefined, defaultList: Array<string>): Array<string> {
+export function replaceDefault(inList: Array<string> | Nullish, defaultList: Array<string>): Array<string> {
   if (inList == null || (inList.length === 1 && inList[0] === "default")) {
     return defaultList
   }
@@ -306,7 +333,7 @@ export function replaceDefault(inList: Array<string> | null | undefined, default
   return inList
 }
 
-export function getPlatformIconFileName(value: string | null | undefined, isMac: boolean) {
+export function getPlatformIconFileName(value: string | Nullish, isMac: boolean) {
   if (value === undefined) {
     return undefined
   }
@@ -337,7 +364,7 @@ export function isPullRequest() {
   )
 }
 
-export function isEnvTrue(value: string | null | undefined) {
+export function isEnvTrue(value: string | Nullish) {
   if (value != null) {
     value = value.trim()
   }
@@ -394,20 +421,6 @@ export async function executeAppBuilder(
   if (maxRetries === 0) {
     return runCommand()
   } else {
-    return retry(runCommand, maxRetries, 1000)
-  }
-}
-
-export async function retry<T>(task: () => Promise<T>, retriesLeft: number, interval: number, backoff = 0, attempt = 0): Promise<T> {
-  try {
-    return await task()
-  } catch (error: any) {
-    log.info(`Above command failed, retrying ${retriesLeft} more times`)
-    if (retriesLeft > 0) {
-      await new Promise(resolve => setTimeout(resolve, interval + backoff * attempt))
-      return await retry(task, retriesLeft - 1, interval, backoff, attempt + 1)
-    } else {
-      throw error
-    }
+    return retry(runCommand, { retries: maxRetries, interval: 1000 })
   }
 }

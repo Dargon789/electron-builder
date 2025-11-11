@@ -1,25 +1,37 @@
-import BluebirdPromise from "bluebird-lst"
-import { Arch, asArray, AsyncTaskManager, InvalidConfigurationError, isEmptyOrSpaces, isPullRequest, log, safeStringifyJson, serializeToYaml } from "builder-util"
+import { Arch, asArray, AsyncTaskManager, exists, InvalidConfigurationError, isEmptyOrSpaces, isPullRequest, log, safeStringifyJson, serializeToYaml } from "builder-util"
 import {
+  BitbucketOptions,
   CancellationToken,
   GenericServerOptions,
   getS3LikeProviderBaseUrl,
   GithubOptions,
+  githubTagPrefix,
   githubUrl,
+  GitlabOptions,
   KeygenOptions,
-  SnapStoreOptions,
+  Nullish,
   PublishConfiguration,
   PublishProvider,
-  BitbucketOptions,
+  SnapStoreOptions,
 } from "builder-util-runtime"
 import _debug from "debug"
-import { getCiTag, PublishContext, Publisher, PublishOptions, UploadTask } from "electron-publish"
-import { GitHubPublisher } from "electron-publish/out/gitHubPublisher"
+import {
+  BitbucketPublisher,
+  getCiTag,
+  GitHubPublisher,
+  GitlabPublisher,
+  KeygenPublisher,
+  PublishContext,
+  Publisher,
+  PublishOptions,
+  S3Publisher,
+  SnapStorePublisher,
+  SpacesPublisher,
+  UploadTask,
+} from "electron-publish"
 import { MultiProgress } from "electron-publish/out/multiProgress"
-import S3Publisher from "./s3/s3Publisher"
-import SpacesPublisher from "./s3/spacesPublisher"
 import { writeFile } from "fs/promises"
-import * as isCi from "is-ci"
+import * as isCi from "ci-info"
 import * as path from "path"
 import { WriteStream as TtyWriteStream } from "tty"
 import * as url from "url"
@@ -28,10 +40,8 @@ import { Packager } from "../packager"
 import { PlatformPackager } from "../platformPackager"
 import { expandMacro } from "../util/macroExpander"
 import { WinPackager } from "../winPackager"
-import { SnapStorePublisher } from "./SnapStorePublisher"
 import { createUpdateInfoTasks, UpdateInfoFileTask, writeUpdateInfoFiles } from "./updateInfoBuilder"
-import { KeygenPublisher } from "./KeygenPublisher"
-import { BitbucketPublisher } from "./BitbucketPublisher"
+import { resolveModule } from "../util/resolve"
 
 const publishForPrWarning =
   "There are serious security concerns with PUBLISH_FOR_PULL_REQUEST=true (see the  CircleCI documentation (https://circleci.com/docs/1.0/fork-pr-builds/) for details)" +
@@ -62,7 +72,11 @@ export class PublishManager implements PublishContext {
 
   private readonly updateFileWriteTask: Array<UpdateInfoFileTask> = []
 
-  constructor(private readonly packager: Packager, private readonly publishOptions: PublishOptions, readonly cancellationToken: CancellationToken = packager.cancellationToken) {
+  constructor(
+    private readonly packager: Packager,
+    private readonly publishOptions: PublishOptions,
+    readonly cancellationToken: CancellationToken = packager.cancellationToken
+  ) {
     checkOptions(publishOptions.publish)
 
     this.taskManager = new AsyncTaskManager(cancellationToken)
@@ -99,7 +113,7 @@ export class PublishManager implements PublishContext {
       )
     }
 
-    packager.addAfterPackHandler(async event => {
+    packager.onAfterPack(async event => {
       const packager = event.packager
       if (event.electronPlatformName === "darwin") {
         if (!event.targets.some(it => it.name === "dmg" || it.name === "zip")) {
@@ -117,7 +131,7 @@ export class PublishManager implements PublishContext {
       }
     })
 
-    packager.artifactCreated(event => {
+    packager.onArtifactCreated(async event => {
       const publishConfiguration = event.publishConfig
       if (publishConfiguration == null) {
         this.taskManager.addTask(this.artifactCreatedWithoutExplicitPublishConfig(event))
@@ -125,7 +139,7 @@ export class PublishManager implements PublishContext {
         if (debug.enabled) {
           debug(`artifactCreated (isPublish: ${this.isPublish}): ${safeStringifyJson(event, new Set(["packager"]))},\n  publishConfig: ${safeStringifyJson(publishConfiguration)}`)
         }
-        this.scheduleUpload(publishConfiguration, event, this.getAppInfo(event.packager))
+        await this.scheduleUpload(publishConfiguration, event, this.getAppInfo(event.packager))
       }
     })
   }
@@ -139,17 +153,16 @@ export class PublishManager implements PublishContext {
     return await resolvePublishConfigurations(publishers, null, this.packager, null, true)
   }
 
-  /** @internal */
-  scheduleUpload(publishConfig: PublishConfiguration, event: UploadTask, appInfo: AppInfo): void {
+  async scheduleUpload(publishConfig: PublishConfiguration, event: UploadTask, appInfo: AppInfo): Promise<void> {
     if (publishConfig.provider === "generic") {
       return
     }
 
-    const publisher = this.getOrCreatePublisher(publishConfig, appInfo)
+    const publisher = await this.getOrCreatePublisher(publishConfig, appInfo)
     if (publisher == null) {
       log.debug(
         {
-          file: event.file,
+          file: log.filePath(event.file),
           reason: "publisher is null",
           publishConfig: safeStringifyJson(publishConfig),
         },
@@ -160,7 +173,7 @@ export class PublishManager implements PublishContext {
 
     const providerName = publisher.providerName
     if (this.publishOptions.publish === "onTagOrDraft" && getCiTag() == null && providerName !== "bitbucket" && providerName !== "github") {
-      log.info({ file: event.file, reason: "current build is not for a git tag", publishPolicy: "onTagOrDraft" }, `not published to ${providerName}`)
+      log.info({ file: log.filePath(event.file), reason: "current build is not for a git tag", publishPolicy: "onTagOrDraft" }, `not published to ${providerName}`)
       return
     }
 
@@ -195,7 +208,7 @@ export class PublishManager implements PublishContext {
           break
         }
 
-        this.scheduleUpload(publishConfig, event, this.getAppInfo(platformPackager))
+        await this.scheduleUpload(publishConfig, event, this.getAppInfo(platformPackager))
       }
     }
 
@@ -210,12 +223,12 @@ export class PublishManager implements PublishContext {
     }
   }
 
-  private getOrCreatePublisher(publishConfig: PublishConfiguration, appInfo: AppInfo): Publisher | null {
+  private async getOrCreatePublisher(publishConfig: PublishConfiguration, appInfo: AppInfo): Promise<Publisher | null> {
     // to not include token into cache key
     const providerCacheKey = safeStringifyJson(publishConfig)
     let publisher = this.nameToPublisher.get(providerCacheKey)
     if (publisher == null) {
-      publisher = createPublisher(this, appInfo.version, publishConfig, this.publishOptions, this.packager)
+      publisher = await createPublisher(this, appInfo.version, publishConfig, this.publishOptions, this.packager)
       this.nameToPublisher.set(providerCacheKey, publisher)
       log.info({ publisher: publisher!.toString() }, "publishing")
     }
@@ -254,7 +267,7 @@ export async function getAppUpdatePublishConfiguration(packager: PlatformPackage
 
   if (packager.platform === Platform.WINDOWS && publishConfig.publisherName == null) {
     const winPackager = packager as WinPackager
-    const publisherName = winPackager.isForceCodeSigningVerification ? await winPackager.computedPublisherName.value : undefined
+    const publisherName = winPackager.isForceCodeSigningVerification ? await (await winPackager.signingManager.value).computedPublisherName.value : undefined
     if (publisherName != null) {
       publishConfig.publisherName = publisherName
     }
@@ -288,7 +301,13 @@ export async function getPublishConfigsForUpdateInfo(
   return publishConfigs
 }
 
-export function createPublisher(context: PublishContext, version: string, publishConfig: PublishConfiguration, options: PublishOptions, packager: Packager): Publisher | null {
+export async function createPublisher(
+  context: PublishContext,
+  version: string,
+  publishConfig: PublishConfiguration,
+  options: PublishOptions,
+  packager: Packager
+): Promise<Publisher | null> {
   if (debug.enabled) {
     debug(`Create publisher: ${safeStringifyJson(publishConfig)}`)
   }
@@ -297,6 +316,9 @@ export function createPublisher(context: PublishContext, version: string, publis
   switch (provider) {
     case "github":
       return new GitHubPublisher(context, publishConfig as GithubOptions, version, options)
+
+    case "gitlab":
+      return new GitlabPublisher(context, publishConfig as GitlabOptions, version)
 
     case "keygen":
       return new KeygenPublisher(context, publishConfig as KeygenOptions, version)
@@ -308,16 +330,19 @@ export function createPublisher(context: PublishContext, version: string, publis
       return null
 
     default: {
-      const clazz = requireProviderClass(provider, packager)
+      const clazz = await requireProviderClass(provider, packager)
       return clazz == null ? null : new clazz(context, publishConfig)
     }
   }
 }
 
-function requireProviderClass(provider: string, packager: Packager): any | null {
+async function requireProviderClass(provider: string, packager: Packager): Promise<any | null> {
   switch (provider) {
     case "github":
       return GitHubPublisher
+
+    case "gitlab":
+      return GitlabPublisher
 
     case "generic":
       return null
@@ -338,18 +363,19 @@ function requireProviderClass(provider: string, packager: Packager): any | null 
       return BitbucketPublisher
 
     default: {
-      const name = `electron-publisher-${provider}`
-      let module: any = null
-      try {
-        module = require(path.join(packager.buildResourcesDir, name + ".js"))
-      } catch (ignored) {
-        console.log(ignored)
-      }
+      const extensions = ["mjs", "js", "cjs"]
+      const template = `electron-publisher-${provider}`
+      const name = (ext: string) => `${template}.${ext}`
 
-      if (module == null) {
-        module = require(name)
+      const validPublisherFiles = extensions.map(ext => path.join(packager.buildResourcesDir, name(ext)))
+      for (const potentialFile of validPublisherFiles) {
+        if (await exists(potentialFile)) {
+          const module: any = await resolveModule(packager.appInfo.type, potentialFile)
+          return module.default || module
+        }
       }
-      return module.default || module
+      log.error({ path: log.filePath(packager.buildResourcesDir), template, extensionsChecked: extensions }, "unable to find publish provider in build resources")
+      throw new InvalidConfigurationError(`Cannot find module for publisher "${provider}" with any extension: ${extensions.join(", ")}`)
     }
   }
 }
@@ -368,7 +394,7 @@ export function computeDownloadUrl(publishConfiguration: PublishConfiguration, f
   let baseUrl
   if (publishConfiguration.provider === "github") {
     const gh = publishConfiguration as GithubOptions
-    baseUrl = `${githubUrl(gh)}/${gh.owner}/${gh.repo}/releases/download/${gh.vPrefixedTagName === false ? "" : "v"}${packager.appInfo.version}`
+    baseUrl = `${githubUrl(gh)}/${gh.owner}/${gh.repo}/releases/download/${githubTagPrefix(gh)}${packager.appInfo.version}`
   } else {
     baseUrl = getS3LikeProviderBaseUrl(publishConfiguration)
   }
@@ -381,7 +407,7 @@ export function computeDownloadUrl(publishConfiguration: PublishConfiguration, f
 
 export async function getPublishConfigs(
   platformPackager: PlatformPackager<any>,
-  targetSpecificOptions: PlatformSpecificBuildOptions | null | undefined,
+  targetSpecificOptions: PlatformSpecificBuildOptions | Nullish,
   arch: Arch | null,
   errorIfCannot: boolean
 ): Promise<Array<PublishConfiguration> | null> {
@@ -424,6 +450,8 @@ async function resolvePublishConfigurations(
     let serviceName: PublishProvider | null = null
     if (!isEmptyOrSpaces(process.env.GH_TOKEN) || !isEmptyOrSpaces(process.env.GITHUB_TOKEN)) {
       serviceName = "github"
+    } else if (!isEmptyOrSpaces(process.env.GITLAB_TOKEN)) {
+      serviceName = "gitlab"
     } else if (!isEmptyOrSpaces(process.env.KEYGEN_TOKEN)) {
       serviceName = "keygen"
     } else if (!isEmptyOrSpaces(process.env.BITBUCKET_TOKEN)) {
@@ -445,9 +473,9 @@ async function resolvePublishConfigurations(
   }
 
   debug(`Explicit publish provider: ${safeStringifyJson(publishers)}`)
-  return await (BluebirdPromise.map(asArray(publishers), it =>
-    getResolvedPublishConfig(platformPackager, packager, typeof it === "string" ? { provider: it } : it, arch, errorIfCannot)
-  ) as Promise<Array<PublishConfiguration>>)
+  return (await Promise.all(
+    asArray(publishers).map(it => getResolvedPublishConfig(platformPackager, packager, typeof it === "string" ? { provider: it } : it, arch, errorIfCannot))
+  )) as PublishConfiguration[]
 }
 
 function isSuitableWindowsTarget(target: Target) {
@@ -481,7 +509,7 @@ async function getResolvedPublishConfig(
   options: PublishConfiguration,
   arch: Arch | null,
   errorIfCannot: boolean
-): Promise<PublishConfiguration | GithubOptions | BitbucketOptions | null> {
+): Promise<PublishConfiguration | GithubOptions | BitbucketOptions | GitlabOptions | null> {
   options = { ...options }
   expandPublishConfig(options, platformPackager, packager, arch)
 
@@ -506,7 +534,7 @@ async function getResolvedPublishConfig(
     return options
   }
 
-  const providerClass = requireProviderClass(options.provider, packager)
+  const providerClass = await requireProviderClass(options.provider, packager)
   if (providerClass != null && providerClass.checkAndResolveOptions != null) {
     await providerClass.checkAndResolveOptions(options, channelFromAppVersion, errorIfCannot)
     return options
@@ -542,7 +570,7 @@ async function getResolvedPublishConfig(
       return info
     }
 
-    const message = `Cannot detect repository by .git/config. Please specify "repository" in the package.json (https://docs.npmjs.com/files/package.json#repository).\nPlease see https://electron.build/configuration/publish`
+    const message = `Cannot detect repository by .git/config. Please specify "repository" in the package.json (https://docs.npmjs.com/files/package.json#repository).\nPlease see https://electron.build/publish`
     if (errorIfCannot) {
       throw new Error(message)
     } else {

@@ -6,7 +6,7 @@ import { AppUpdater } from "../AppUpdater"
 import { URL } from "url"
 import { getChannelFilename, newUrlFromBase } from "../util"
 import { BaseGitHubProvider } from "./GitHubProvider"
-import { ResolvedUpdateFileInfo } from "../main"
+import { ResolvedUpdateFileInfo } from "../types"
 import { getFileList, ProviderRuntimeOptions } from "./Provider"
 
 export interface PrivateGitHubUpdateInfo extends UpdateInfo {
@@ -14,7 +14,12 @@ export interface PrivateGitHubUpdateInfo extends UpdateInfo {
 }
 
 export class PrivateGitHubProvider extends BaseGitHubProvider<PrivateGitHubUpdateInfo> {
-  constructor(options: GithubOptions, private readonly updater: AppUpdater, private readonly token: string, runtimeOptions: ProviderRuntimeOptions) {
+  constructor(
+    options: GithubOptions,
+    private readonly updater: AppUpdater,
+    private readonly token: string,
+    runtimeOptions: ProviderRuntimeOptions
+  ) {
     super(options, "api.github.com", runtimeOptions)
   }
 
@@ -54,7 +59,6 @@ export class PrivateGitHubProvider extends BaseGitHubProvider<PrivateGitHubUpdat
     return this.configureHeaders("application/octet-stream")
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   private configureHeaders(accept: string) {
     return {
       accept,

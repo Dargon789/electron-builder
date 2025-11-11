@@ -1,11 +1,12 @@
+import { SignOptions as MacSignOptions } from "@electron/osx-sign/dist/cjs/types"
+import { Identity } from "app-builder-lib/out/codeSign/macCodeSign"
+import { DoPackOptions } from "app-builder-lib/out/platformPackager"
+import { WinPackager, getArchSuffix, MacPackager } from "app-builder-lib"
 import { AsyncTaskManager } from "builder-util"
+import { DmgTarget } from "dmg-builder"
 import { Arch, MacConfiguration, Packager, Target } from "electron-builder"
 import SquirrelWindowsTarget from "electron-builder-squirrel-windows"
-import { Identity } from "app-builder-lib/out/codeSign/macCodeSign"
-import MacPackager from "app-builder-lib/out/macPackager"
-import { DmgTarget } from "dmg-builder"
-import { WinPackager } from "app-builder-lib/out/winPackager"
-import { SignOptions as MacSignOptions } from "@electron/osx-sign/dist/cjs/types"
+import * as path from "path"
 
 export class CheckingWinPackager extends WinPackager {
   effectiveDistOptions: any
@@ -17,9 +18,11 @@ export class CheckingWinPackager extends WinPackager {
   //noinspection JSUnusedLocalSymbols
   async pack(outDir: string, arch: Arch, targets: Array<Target>, taskManager: AsyncTaskManager): Promise<any> {
     // skip pack
-    const helperClass: typeof SquirrelWindowsTarget = require("electron-builder-squirrel-windows").default
-    this.effectiveDistOptions = await new helperClass(this, outDir).computeEffectiveDistOptions()
-
+    const helperClass: typeof SquirrelWindowsTarget = (await import("electron-builder-squirrel-windows")).default
+    const newClass = new helperClass(this, outDir)
+    const setupFile = this.expandArtifactNamePattern(newClass.options, "exe", arch, "${productName} Setup ${version}.${ext}")
+    const installerOutDir = path.join(outDir, `squirrel-windows${getArchSuffix(arch)}`)
+    this.effectiveDistOptions = await newClass.computeEffectiveDistOptions(installerOutDir, outDir, setupFile)
     await this.sign(this.computeAppOutDir(outDir, arch))
   }
 
@@ -41,7 +44,7 @@ export class CheckingMacPackager extends MacPackager {
     for (const target of targets) {
       // do not use instanceof to avoid dmg require
       if (target.name === "dmg") {
-        this.effectiveDistOptions = await (target as DmgTarget).computeDmgOptions()
+        this.effectiveDistOptions = await (target as DmgTarget).computeDmgOptions("stub")
         break
       }
     }
@@ -50,13 +53,14 @@ export class CheckingMacPackager extends MacPackager {
   }
 
   //noinspection JSUnusedLocalSymbols
-  async doPack(outDir: string, appOutDir: string, platformName: string, arch: Arch, customBuildOptions: MacConfiguration, targets: Array<Target>) {
+  async doPack(_options: DoPackOptions<MacConfiguration>) {
     // skip
   }
 
   //noinspection JSUnusedGlobalSymbols
   async doSign(opts: MacSignOptions): Promise<any> {
     this.effectiveSignOptions = opts
+    return Promise.resolve()
   }
 
   //noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols

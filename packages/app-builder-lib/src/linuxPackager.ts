@@ -1,4 +1,5 @@
 import { Arch } from "builder-util"
+import { sanitizeFileName } from "builder-util/out/filename"
 import { DIR_TARGET, Platform, Target } from "./core"
 import { LinuxConfiguration } from "./options/linuxOptions"
 import { Packager } from "./packager"
@@ -9,7 +10,6 @@ import FpmTarget from "./targets/FpmTarget"
 import { LinuxTargetHelper } from "./targets/LinuxTargetHelper"
 import SnapTarget from "./targets/snap"
 import { createCommonTarget } from "./targets/targetFactory"
-import { sanitizeFileName } from "./util/filename"
 
 export class LinuxPackager extends PlatformPackager<LinuxConfiguration> {
   readonly executableName: string
@@ -18,7 +18,7 @@ export class LinuxPackager extends PlatformPackager<LinuxConfiguration> {
     super(info, Platform.LINUX)
 
     const executableName = this.platformSpecificBuildOptions.executableName ?? info.config.executableName
-    this.executableName = executableName == null ? this.appInfo.sanitizedName.toLowerCase() : sanitizeFileName(executableName)
+    this.executableName = executableName == null ? this.appInfo.sanitizedProductName : sanitizeFileName(executableName)
   }
 
   get defaultTarget(): Array<string> {

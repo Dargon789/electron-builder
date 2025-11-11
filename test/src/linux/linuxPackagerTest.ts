@@ -1,13 +1,13 @@
+import { GenericServerOptions } from "builder-util-runtime"
 import { Arch, build, Platform } from "electron-builder"
 import { outputFile } from "fs-extra"
+import * as fs from "fs/promises"
 import * as path from "path"
-import { GenericServerOptions } from "builder-util-runtime"
 import { assertThat } from "../helpers/fileAssert"
 import { app, appThrows, copyTestAsset, modifyPackageJson } from "../helpers/packTester"
 import { ELECTRON_VERSION } from "../helpers/testConfig"
-import * as fs from "fs/promises"
 
-const appImageTarget = Platform.LINUX.createTarget("appimage")
+const appImageTarget = Platform.LINUX.createTarget("appimage", Arch.x64)
 
 // test update info file name
 const testPublishConfig: GenericServerOptions = {
@@ -15,35 +15,32 @@ const testPublishConfig: GenericServerOptions = {
   url: "https://example.com/download",
 }
 
-test.ifNotWindows(
-  "AppImage",
-  app({
+test.ifNotWindows("AppImage", ({ expect }) =>
+  app(expect, {
     targets: appImageTarget,
-    config: {
-      downloadAlternateFFmpeg: true,
-      publish: testPublishConfig,
-    },
-  })
-)
-
-// also test os macro in output dir
-test.ifAll.ifNotWindows.ifNotCiMac(
-  "AppImage ia32",
-  app({
-    targets: Platform.LINUX.createTarget("Appimage", Arch.ia32),
     config: {
       directories: {
         // tslint:disable:no-invalid-template-strings
         output: "dist/${os}",
       },
+      downloadAlternateFFmpeg: true,
       publish: testPublishConfig,
+      electronFuses: {
+        runAsNode: true,
+        enableCookieEncryption: true,
+        enableNodeOptionsEnvironmentVariable: true,
+        enableNodeCliInspectArguments: true,
+        enableEmbeddedAsarIntegrityValidation: true,
+        onlyLoadAppFromAsar: true,
+        loadBrowserProcessSpecificV8Snapshot: true,
+        grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
+      },
     },
   })
 )
 
-test.ifAll.ifNotWindows.ifNotCiMac(
-  "AppImage arm, max compression",
-  app({
+test.ifNotWindows.ifNotCiMac("AppImage arm, max compression", ({ expect }) =>
+  app(expect, {
     targets: Platform.LINUX.createTarget("Appimage", Arch.armv7l),
     config: {
       publish: testPublishConfig,
@@ -52,9 +49,8 @@ test.ifAll.ifNotWindows.ifNotCiMac(
   })
 )
 
-test.ifNotWindows.ifNotCiMac.ifAll(
-  "AppImage - deprecated systemIntegration",
-  appThrows({
+test.ifNotWindows.ifNotCiMac("AppImage - deprecated systemIntegration", ({ expect }) =>
+  appThrows(expect, {
     targets: appImageTarget,
     config: {
       appImage: {
@@ -64,9 +60,9 @@ test.ifNotWindows.ifNotCiMac.ifAll(
   })
 )
 
-test.ifNotWindows.ifNotCiMac.ifAll(
-  "text license and file associations",
+test.ifNotWindows.ifNotCiMac("text license and file associations", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -93,9 +89,9 @@ test.ifNotWindows.ifNotCiMac.ifAll(
   )
 )
 
-test.ifNotWindows.ifNotCiMac.ifAll(
-  "html license",
+test.ifNotWindows.ifNotCiMac("html license", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
     },
@@ -107,7 +103,7 @@ test.ifNotWindows.ifNotCiMac.ifAll(
         <html lang="en">
         <body>
           <a href="https://example.com">Test link</a>
-        </body>      
+        </body>
         </html>`
         )
       },
@@ -115,22 +111,48 @@ test.ifNotWindows.ifNotCiMac.ifAll(
   )
 )
 
-test.ifNotWindows.ifNotCiMac(
-  "AppImage - default icon, custom executable and custom desktop",
+test.ifNotWindows.ifNotCiMac("AppImage - default icon, custom executable and custom desktop", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
         linux: {
           executableName: "Foo",
+          // Example Spec: https://specifications.freedesktop.org/desktop-entry-spec/latest/example.html
           desktop: {
-            "X-Foo": "bar",
-            Terminal: "true",
+            entry: {
+              "X-Foo": "bar",
+              Terminal: "true",
+            },
+            desktopActions: {
+              Gallery: {
+                Exec: "fooview --gallery",
+                Name: "Browse Gallery",
+              },
+              Create: {
+                Exec: "fooview --create-new",
+                Name: "Create a new Foo!",
+                Icon: "fooview-new",
+              },
+              EmptyEntry: {},
+              NullEntry: null,
+            },
           },
         },
         appImage: {
           // tslint:disable-next-line:no-invalid-template-strings
           artifactName: "boo-${productName}",
+        },
+        electronFuses: {
+          runAsNode: true,
+          enableCookieEncryption: true,
+          enableNodeOptionsEnvironmentVariable: true,
+          enableNodeCliInspectArguments: true,
+          enableEmbeddedAsarIntegrityValidation: true,
+          onlyLoadAppFromAsar: true,
+          loadBrowserProcessSpecificV8Snapshot: true,
+          grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
         },
       },
       effectiveOptionComputed: async it => {
@@ -148,15 +170,15 @@ test.ifNotWindows.ifNotCiMac(
       projectDirCreated: it => fs.rm(path.join(it, "build"), { recursive: true, force: true }),
       packed: async context => {
         const projectDir = context.getContent(Platform.LINUX)
-        await assertThat(path.join(projectDir, "Foo")).isFile()
+        await assertThat(expect, path.join(projectDir, "Foo")).isFile()
       },
     }
   )
 )
 
-test.ifNotWindows(
-  "icons from ICNS (mac)",
+test.ifNotWindows("icons from ICNS (mac)", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -179,15 +201,15 @@ test.ifNotWindows(
       },
       packed: async context => {
         const projectDir = context.getResources(Platform.LINUX)
-        await assertThat(projectDir).isDirectory()
+        await assertThat(expect, projectDir).isDirectory()
       },
     }
   )
 )
 
-test.ifNotWindows(
-  "icons from ICNS if nothing specified",
+test.ifNotWindows("icons from ICNS if nothing specified", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -202,9 +224,9 @@ test.ifNotWindows(
   )
 )
 
-test.ifNotWindows(
-  "icons from dir and one icon with suffix",
+test.ifNotWindows("icons from dir and one icon with suffix", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -217,15 +239,15 @@ test.ifNotWindows(
       },
       packed: async context => {
         const projectDir = context.getResources(Platform.LINUX)
-        await assertThat(projectDir).isDirectory()
+        await assertThat(expect, projectDir).isDirectory()
       },
     }
   )
 )
 
-test.ifNotWindows(
-  "icons dir with images without size in the filename",
+test.ifNotWindows("icons dir with images without size in the filename", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -244,16 +266,16 @@ test.ifNotWindows(
       },
       packed: async context => {
         const projectDir = context.getResources(Platform.LINUX)
-        await assertThat(projectDir).isDirectory()
+        await assertThat(expect, projectDir).isDirectory()
       },
     }
   )
 )
 
 // test prepacked asar also https://github.com/electron-userland/electron-builder/issues/1102
-test.ifNotWindows(
-  "icons from ICNS",
+test.ifNotWindows("icons from ICNS", ({ expect }) =>
   app(
+    expect,
     {
       targets: appImageTarget,
       config: {
@@ -278,16 +300,16 @@ test.ifNotWindows(
           },
         })
 
-        await assertThat(path.join(projectDir, "dist")).isDirectory()
+        await assertThat(expect, path.join(projectDir, "dist")).isDirectory()
       },
     }
   )
 )
 
-test.ifNotWindows(
-  "no-author-email",
+test.ifNotWindows("no-author-email", ({ expect }) =>
   appThrows(
-    { targets: Platform.LINUX.createTarget("deb") },
+    expect,
+    { targets: Platform.LINUX.createTarget("deb", Arch.x64) },
     {
       projectDirCreated: projectDir =>
         modifyPackageJson(projectDir, data => {
@@ -297,14 +319,15 @@ test.ifNotWindows(
   )
 )
 
-test.ifNotWindows(
-  "forbid desktop.Exec",
-  appThrows({
-    targets: Platform.LINUX.createTarget("AppImage"),
+test.ifNotWindows("forbid desktop.Exec", ({ expect }) =>
+  appThrows(expect, {
+    targets: appImageTarget,
     config: {
       linux: {
         desktop: {
-          Exec: "foo",
+          entry: {
+            Exec: "foo",
+          },
         },
       },
     },

@@ -2,32 +2,79 @@ name: Test
 
 on:
   push:
-    branches:
-      master
+    branches: [master]
   pull_request:
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
     inputs:
-      build-docker-locally:
+      rebuild-docker-images:
+        description: "Rebuild all Docker images"
+        default: false
+        type: "boolean"
+  workflow_call: # Allow this workflow to be called from other workflows
+    inputs:
+      rebuild-docker-images-call:
+        description: "Rebuild all Docker images"
+        required: true
         type: boolean
-        description: Force rebuild docker images for CI tests
-        required: false
 
 permissions:
-  contents: read # to fetch code (actions/checkout)
+  contents: read
+
+env:
+  TEST_IMAGE_NODE_MAJOR_VERSION: 22
 
 jobs:
-  test-linux:
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        testFiles:
-          - ArtifactPublisherTest,BuildTest,ExtraBuildTest,RepoSlugTest,binDownloadTest,configurationValidationTest,filenameUtilTest,filesTest,globTest,ignoreTest,macroExpanderTest,mainEntryTest,urlUtilTest,extraMetadataTest,linuxArchiveTest,linuxPackagerTest,HoistedNodeModuleTest
-          - snapTest,debTest,fpmTest,protonTest
+  check-if-docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      force-docker-build: ${{ steps.changes.outputs.docker == 'true' || steps.changes.outputs.workflow == 'true' }}
     steps:
       - name: Checkout code repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Determine if Dockerfiles changed
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          filters: |
+            docker:
+              - 'docker/**'
+            workflow:
+              - '.github/workflows/docker*'
+
+  run-docker-build:
+    needs: check-if-docker-build
+    if: |
+      always() &&
+      (needs.check-if-docker-build.outputs.force-docker-build == 'true' ||
+      inputs.rebuild-docker-images == 'true' || inputs.rebuild-docker-images == true ||
+      inputs.rebuild-docker-images-call == 'true' || inputs.rebuild-docker-images-call == true)
+    uses: ./.github/workflows/docker-build.yml
+
+  test-linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    needs: [check-if-docker-build, run-docker-build]
+    # Wonky if-conditional to allow this step to run AFTER docker images are rebuilt OR if the build stage skipped and we want to use dockerhub registry for images
+    if: |
+      always() &&
+      needs.check-if-docker-build.result == 'success' &&
+      (needs.run-docker-build.result == 'success' || needs.run-docker-build.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        testFiles:
+          - ArtifactPublisherTest,BuildTest,ExtraBuildTest,RepoSlugTest,binDownloadTest,configurationValidationTest,filenameUtilTest,filesTest,globTest,httpExecutorTest,ignoreTest,macroExpanderTest,mainEntryTest,urlUtilTest,extraMetadataTest,linuxArchiveTest,linuxPackagerTest,HoistedNodeModuleTest,MemoLazyTest,HoistTest,ExtraBuildResourcesTest,utilTest
+          - snapTest,debTest,fpmTest,protonTest
+          - winPackagerTest,winCodeSignTest,webInstallerTest
+          - oneClickInstallerTest,assistedInstallerTest
+          - concurrentBuildsTest
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -35,87 +82,194 @@ jobs:
         uses: ./.github/actions/pretest
         with:
           cache-path: ~/.cache/electron
-          cache-key: v-17.0.0-linux-electron
+          cache-key: v-23.3.10-linux-electron
+
+      - name: Download test-runner if exists
+        if: needs.run-docker-build.result == 'success'
+        id: download-test-runner-image
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: electron-builder-all-${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}
+          path: ${{ runner.temp }}
+
+      - name: Load test runner image if needed
+        if: needs.run-docker-build.result == 'success'
+        run: |
+          docker image load --input ${{ runner.temp }}/electron-builder-all-${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}.tar
+          docker image ls -a
 
       - name: Lint
         run: pnpm pretest
 
-      - name: Determine if Dockerfiles changed
-        id: changed-files-specific
-        uses: tj-actions/changed-files@94549999469dbfa032becf298d95c87a14c34394 # v40
-        with:
-          files: docker/**/*
-
-      - name: Dockerfile has changed, rebuild for tests
-        if: steps.changed-files-specific.outputs.any_changed == 'true'
-        run: pnpm docker-images
-
       - name: Run tests in docker image
-        run: pnpm test-linux
+        run: |
+          echo $TEST_RUNNER_IMAGE_TAG
+          pnpm test-linux
         env:
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           TEST_FILES: ${{ matrix.testFiles }}
           FORCE_COLOR: 1
-  
-  test-mac:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+          TEST_RUNNER_IMAGE_TAG: electronuserland/builder:${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}-wine-mono
 
-      - name: Setup Tests
-        uses: ./.github/actions/pretest
-        with:
-          cache-path: ~/Library/Caches/electron
-          cache-key: v-17.0.0-macos-electron
-
-      - name: Test
-        run: pnpm ci:test
-        env:
-          TEST_FILES: masTest,dmgTest,filesTest,macPackagerTest
-          FORCE_COLOR: 1
-  
   # Need to separate from other tests because logic is specific to when TOKEN env vars are set
   test-updater:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    needs: [check-if-docker-build, run-docker-build]
+    # Wonky if-conditional to allow this step to run AFTER docker images are rebuilt OR if the build stage skipped and we want to use dockerhub registry for images
+    if: |
+      always() &&
+      needs.check-if-docker-build.result == 'success' &&
+      (needs.run-docker-build.result == 'success' || needs.run-docker-build.result == 'skipped')
     steps:
       - name: Checkout code repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Tests
         uses: ./.github/actions/pretest
         with:
           cache-path: ~/.cache/electron
-          cache-key: v-17.0.0-update-electron
+          cache-key: v-23.3.10-update-electron
+
+      - name: Download test-runner if exists
+        if: needs.run-docker-build.result == 'success'
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: electron-builder-all-${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}
+          path: ${{ runner.temp }}
+
+      - name: Load test runner image if needed
+        if: needs.run-docker-build.result == 'success'
+        run: |
+          docker image load --input ${{ runner.temp }}/electron-builder-all-${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}.tar
+          docker image ls -a
+
+      - name: Lint
+        run: pnpm pretest
 
       - name: Test
-        run: pnpm ci:test
+        run: |
+          echo $TEST_RUNNER_IMAGE_TAG
+          pnpm test-linux
         env:
-          TEST_FILES: nsisUpdaterTest,linuxUpdaterTest,PublishManagerTest
+          TEST_FILES: nsisUpdaterTest,PublishManagerTest,differentialUpdateTest,GitlabPublisherTest,GitlabPublisher.integration.test
           KEYGEN_TOKEN: ${{ secrets.KEYGEN_TOKEN }}
           BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           FORCE_COLOR: 1
+          TEST_RUNNER_IMAGE_TAG: electronuserland/builder:${{ env.TEST_IMAGE_NODE_MAJOR_VERSION }}-wine-mono
 
-  test-windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        testFiles:
-          - installerTest,appxTest,msiTest,portableTest,assistedInstallerTest,protonTest
-          - BuildTest,oneClickInstallerTest,winCodeSignTest,winPackagerTest,webInstallerTest
+  # must be it's own build node due to docker library/images size limit on github hosted runners
+  test-e2e:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - name: Checkout code repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Tests
         uses: ./.github/actions/pretest
         with:
-          cache-key: v-17.0.0-windows-electron
+          cache-path: ~/.cache/electron
+          cache-key: v-23.3.10-update-electron
+
+      - name: Verify Docs Generation
+        run: pnpm generate-all
+
+      - name: e2e Linux Updater tests (install, auto-update, uninstall)
+        run: |
+          sh test/src/updater/test-specific-platforms.sh
+
+  test-windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        testFiles:
+          - winCodeSignTest,differentialUpdateTest,squirrelWindowsTest
+          - appxTest,msiTest,portableTest,assistedInstallerTest,protonTest
+          - BuildTest,oneClickInstallerTest,winPackagerTest,nsisUpdaterTest,webInstallerTest
+          - concurrentBuildsTest
+          - blackboxUpdateTest
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Tests
+        uses: ./.github/actions/pretest
+        with:
+          cache-key: v-23.3.10-windows-electron
           cache-path: ~\AppData\Local\electron\Cache
-      
+
       - name: Test
         run: pnpm ci:test
         env:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          TEST_FILES: ${{ matrix.testFiles }}
+          FORCE_COLOR: 1
+
+  # Some tests fails while on macOS 26, so we'll keep it this way for now
+  test-mac:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        testFiles:
+          - oneClickInstallerTest,assistedInstallerTest,webInstallerTest
+          - winPackagerTest,winCodeSignTest,BuildTest,blackboxUpdateTest
+          - masTest,dmgTest,filesTest,macPackagerTest,differentialUpdateTest,macArchiveTest
+          - concurrentBuildsTest
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Tests
+        uses: ./.github/actions/pretest
+        with:
+          cache-path: ~/Library/Caches/electron
+          cache-key: v-23.3.10-macos-electron
+
+      - name: Install toolset via brew
+        run: |
+          brew install powershell/tap/powershell
+          brew install --cask wine-stable
+          brew install rpm
+
+      - name: Test
+        run: pnpm ci:test
+        env:
+          TEST_FILES: ${{ matrix.testFiles }}
+          FORCE_COLOR: 1
+
+  test-mac-26:
+    runs-on: macos-26
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        testFiles:
+          - macIconTest
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Tests
+        uses: ./.github/actions/pretest
+        with:
+          cache-path: ~/Library/Caches/electron
+          cache-key: v-23.3.10-macos-electron
+
+      - name: Install toolset via brew
+        run: |
+          brew install powershell/tap/powershell
+          brew install --cask wine-stable
+          brew install rpm
+
+      - name: Test
+        run: pnpm ci:test
+        env:
           TEST_FILES: ${{ matrix.testFiles }}
           FORCE_COLOR: 1

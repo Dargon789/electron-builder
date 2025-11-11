@@ -5,7 +5,7 @@ import { assertThat } from "../helpers/fileAssert"
 import { app, assertPack, copyTestAsset, modifyPackageJson } from "../helpers/packTester"
 import { checkHelpers, doTest, expectUpdateMetadata } from "../helpers/winHelper"
 
-const nsisTarget = Platform.WINDOWS.createTarget(["nsis"])
+const nsisTarget = Platform.WINDOWS.createTarget(["nsis"], Arch.x64)
 
 function pickSnapshotDefines(defines: any) {
   return {
@@ -25,14 +25,16 @@ function pickSnapshotDefines(defines: any) {
   }
 }
 
-test(
-  "one-click",
+test("one-click", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["nsis"], Arch.x64),
       config: {
         win: {
-          publisherName: "Foo, Inc",
+          signtoolOptions: {
+            publisherName: "Foo, Inc",
+          },
         },
         publish: {
           provider: "generic",
@@ -43,22 +45,30 @@ test(
           deleteAppDataOnUninstall: true,
           packElevateHelper: false,
         },
+        electronFuses: {
+          runAsNode: true,
+          enableCookieEncryption: true,
+          enableNodeOptionsEnvironmentVariable: true,
+          enableNodeCliInspectArguments: true,
+          enableEmbeddedAsarIntegrityValidation: true,
+          onlyLoadAppFromAsar: true,
+          loadBrowserProcessSpecificV8Snapshot: true,
+          grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
+        },
       },
     },
     {
       signedWin: true,
       packed: async context => {
-        await checkHelpers(context.getResources(Platform.WINDOWS, Arch.x64), false)
-        await doTest(context.outDir, true, "TestApp Setup", "TestApp", null, false)
-        await expectUpdateMetadata(context, Arch.x64, true)
+        await checkHelpers(expect, context.getResources(Platform.WINDOWS, Arch.x64), false)
+        await doTest(expect, context.outDir, true, "TestApp Setup", "TestApp", null, false)
+        await expectUpdateMetadata(expect, context, Arch.x64, true)
       },
     }
-  )
-)
+  ))
 
-test.ifAll(
-  "custom guid",
-  app({
+test("custom guid", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
     config: {
       appId: "boo",
@@ -68,14 +78,13 @@ test.ifAll(
         guid: "Foo Technologies\\Bar",
       },
     },
-  })
-)
+  }))
 
-test.ifAll.ifNotCiMac(
-  "multi language license",
+test("multi language license", ({ expect }) =>
   app(
+    expect,
     {
-      targets: Platform.WINDOWS.createTarget("nsis"),
+      targets: Platform.WINDOWS.createTarget("nsis", Arch.x64),
       config: {
         publish: null,
         nsis: {
@@ -94,14 +103,13 @@ test.ifAll.ifNotCiMac(
         ])
       },
     }
-  )
-)
+  ))
 
-test.ifAll.ifNotCiMac(
-  "html license",
+test("html license", ({ expect }) =>
   app(
+    expect,
     {
-      targets: Platform.WINDOWS.createTarget("nsis"),
+      targets: Platform.WINDOWS.createTarget("nsis", Arch.x64),
       config: {
         publish: null,
         nsis: {
@@ -117,12 +125,10 @@ test.ifAll.ifNotCiMac(
         ])
       },
     }
-  )
-)
+  ))
 
-test.ifAll.ifDevOrWinCi(
-  "createDesktopShortcut always",
-  app({
+test.ifDevOrWinCi("createDesktopShortcut always", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget("nsis"),
     config: {
       publish: null,
@@ -133,9 +139,9 @@ test.ifAll.ifDevOrWinCi(
   })
 )
 
-test.ifDevOrLinuxCi(
-  "perMachine, no run after finish",
+test.ifDevOrLinuxCi("perMachine, no run after finish", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
       config: {
@@ -169,17 +175,18 @@ test.ifDevOrLinuxCi(
         ])
       },
       packed: async context => {
-        await expectUpdateMetadata(context)
-        await checkHelpers(context.getResources(Platform.WINDOWS, Arch.ia32), true)
-        await doTest(context.outDir, false)
+        await expectUpdateMetadata(expect, context)
+        await checkHelpers(expect, context.getResources(Platform.WINDOWS, Arch.ia32), true)
+        await doTest(expect, context.outDir, false)
       },
     }
   )
 )
 
-test.skip.ifNotCiMac("installerHeaderIcon", () => {
+test.skip("installerHeaderIcon", ({ expect }) => {
   let headerIconPath: string | null = null
   return assertPack(
+    expect,
     "test-app-one",
     {
       targets: nsisTarget,
@@ -198,25 +205,25 @@ test.skip.ifNotCiMac("installerHeaderIcon", () => {
   )
 })
 
-test.ifDevOrLinuxCi(
-  "custom include",
+test.ifDevOrLinuxCi("custom include", ({ expect }) =>
   app(
+    expect,
     { targets: nsisTarget },
     {
       projectDirCreated: projectDir => copyTestAsset("installer.nsh", path.join(projectDir, "build", "installer.nsh")),
       packed: context =>
         Promise.all([
-          assertThat(path.join(context.projectDir, "build", "customHeader")).isFile(),
-          assertThat(path.join(context.projectDir, "build", "customInit")).isFile(),
-          assertThat(path.join(context.projectDir, "build", "customInstall")).isFile(),
+          assertThat(expect, path.join(context.projectDir, "build", "customHeader")).isFile(),
+          assertThat(expect, path.join(context.projectDir, "build", "customInit")).isFile(),
+          assertThat(expect, path.join(context.projectDir, "build", "customInstall")).isFile(),
         ]),
     }
   )
 )
 
-test.skip(
-  "big file pack",
+test.skip("big file pack", ({ expect }) =>
   app(
+    expect,
     {
       targets: nsisTarget,
       config: {
@@ -231,23 +238,22 @@ test.skip(
         await copyFile("/Volumes/Pegasus/15.02.18.m4v", path.join(projectDir, "foo/bar/video.mov"))
       },
     }
-  )
-)
+  ))
 
-test.ifDevOrLinuxCi(
-  "custom script",
+test.ifDevOrLinuxCi("custom script", ({ expect }) =>
   app(
+    expect,
     { targets: nsisTarget },
     {
       projectDirCreated: projectDir => copyTestAsset("installer.nsi", path.join(projectDir, "build", "installer.nsi")),
-      packed: context => assertThat(path.join(context.projectDir, "build", "customInstallerScript")).isFile(),
+      packed: context => assertThat(expect, path.join(context.projectDir, "build", "customInstallerScript")).isFile(),
     }
   )
 )
 
-test.ifAll.ifNotCiMac(
-  "menuCategory",
+test("menuCategory", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
       config: {
@@ -269,15 +275,14 @@ test.ifAll.ifNotCiMac(
           data.name = "test-menu-category"
         }),
       packed: context => {
-        return doTest(context.outDir, false, "Test Menu Category", "test-menu-category", "Foo Bar")
+        return doTest(expect, context.outDir, false, "Test Menu Category", "test-menu-category", "Foo Bar")
       },
     }
-  )
-)
+  ))
 
-test.ifNotCiMac(
-  "string menuCategory",
+test("string menuCategory", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
       config: {
@@ -301,15 +306,13 @@ test.ifNotCiMac(
           data.name = "test-menu-category"
         }),
       packed: async context => {
-        await doTest(context.outDir, false, "Test Menu Category", "test-menu-category", "Foo Bar")
+        await doTest(expect, context.outDir, false, "Test Menu Category", "test-menu-category", "Foo Bar")
       },
     }
-  )
-)
+  ))
 
-test.ifDevOrLinuxCi(
-  "file associations per user",
-  app({
+test.ifDevOrLinuxCi("file associations per user", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["nsis"], Arch.ia32),
     config: {
       publish: null,
@@ -323,14 +326,23 @@ test.ifDevOrLinuxCi(
   })
 )
 
-test.skip.ifWindows(
-  "custom exec name",
-  app({
+test.ifWindows.skip("custom exec name", ({ expect }) =>
+  app(expect, {
     targets: nsisTarget,
     config: {
       productName: "foo",
       win: {
         executableName: "Boo",
+      },
+      electronFuses: {
+        runAsNode: true,
+        enableCookieEncryption: true,
+        enableNodeOptionsEnvironmentVariable: true,
+        enableNodeCliInspectArguments: true,
+        enableEmbeddedAsarIntegrityValidation: true,
+        onlyLoadAppFromAsar: true,
+        loadBrowserProcessSpecificV8Snapshot: true,
+        grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
       },
     },
     effectiveOptionComputed: async it => {
@@ -340,9 +352,8 @@ test.skip.ifWindows(
   })
 )
 
-test.skip.ifWindows(
-  "top-level custom exec name",
-  app({
+test.ifWindows.skip("top-level custom exec name", ({ expect }) =>
+  app(expect, {
     targets: nsisTarget,
     config: {
       publish: null,

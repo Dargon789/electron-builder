@@ -1,41 +1,43 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`expand not defined env 1`] = `"ERR_ELECTRON_BUILDER_ENV_NOT_DEFINED"`;
 
 exports[`extraResources - two-package 1`] = `
-Object {
-  "linux": Array [],
+{
+  "linux": [],
 }
 `;
 
 exports[`extraResources on Linux 1`] = `
-Object {
-  "linux": Array [],
+{
+  "linux": [],
 }
 `;
 
 exports[`extraResources on Windows 1`] = `
-Object {
-  "win": Array [
-    Object {
-      "arch": "x64",
-      "file": "RELEASES",
-    },
-    Object {
+{
+  "win": [
+    {
       "arch": "x64",
       "file": "Test App ßW Setup 1.1.0.exe",
       "safeArtifactName": "TestApp-Setup-1.1.0.exe",
     },
-    Object {
+    {
       "arch": "x64",
       "file": "TestApp-1.1.0-full.nupkg",
+    },
+    {
+      "arch": "x64",
+      "file": "RELEASES",
     },
   ],
 }
 `;
 
 exports[`extraResources on Windows 2`] = `
-Array [
+[
+  "lib/",
+  "lib/net45/",
   "lib/net45/chrome_100_percent.pak",
   "lib/net45/chrome_200_percent.pak",
   "lib/net45/d3dcompiler_47.dll",
@@ -47,43 +49,51 @@ Array [
   "lib/net45/LICENSES.chromium.html",
   "lib/net45/resources.pak",
   "lib/net45/snapshot_blob.bin",
+  "lib/net45/squirrel.exe",
   "lib/net45/Test App ßW.exe",
   "lib/net45/Test App ßW_ExecutionStub.exe",
-  "lib/net45/Update.exe",
   "lib/net45/v8_context_snapshot.bin",
   "lib/net45/vk_swiftshader.dll",
   "lib/net45/vk_swiftshader_icd.json",
   "lib/net45/vulkan-1.dll",
   "lib/net45/locales/en-US.pak",
+  "lib/net45/resources/",
   "lib/net45/resources/app.asar",
   "lib/net45/resources/platformSpecificR",
-  "lib/net45/swiftshader/libEGL.dll",
-  "lib/net45/swiftshader/libGLESv2.dll",
+  "lib/net45/resources/bar/",
   "lib/net45/resources/bar/hello.txt",
   "lib/net45/resources/bar/x64.txt",
+  "lib/net45/resources/dir-relative/",
   "lib/net45/resources/dir-relative/f.txt",
+  "lib/net45/resources/foo/",
   "lib/net45/resources/foo/nameWithoutDot",
+  "lib/net45/resources/win/",
   "lib/net45/resources/win/x64.txt",
+  "package/",
+  "package/services/",
+  "package/services/metadata/",
+  "package/services/metadata/core-properties/",
   "TestApp.nuspec",
   "[Content_Types].xml",
+  "_rels/",
   "_rels/.rels",
 ]
 `;
 
 exports[`extraResources on macOS 1`] = `
-Object {
-  "mac": Array [],
+{
+  "mac": [],
 }
 `;
 
 exports[`files 1`] = `
-Object {
-  "linux": Array [],
+{
+  "linux": [],
 }
 `;
 
 exports[`files 2`] = `
-Array [
+[
   "index.html",
   "index.js",
   "package.json",
@@ -95,13 +105,13 @@ Array [
 `;
 
 exports[`files.from asar 1`] = `
-Object {
-  "linux": Array [],
+{
+  "linux": [],
 }
 `;
 
 exports[`map resources 1`] = `
-Object {
-  "linux": Array [],
+{
+  "linux": [],
 }
 `;

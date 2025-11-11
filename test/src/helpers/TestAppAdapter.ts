@@ -2,8 +2,11 @@ import { ElectronAppAdapter } from "electron-updater/out/ElectronAppAdapter"
 
 // do not implement AppAdapter directly, test that our ElectronAppAdapter implementation is correct
 export class TestAppAdapter extends ElectronAppAdapter {
-  constructor(version: string, private _baseCachePath: string) {
-    super(new MockApp(version))
+  constructor(
+    version: string,
+    private _baseCachePath: string
+  ) {
+    super(new MockApp(version) as any)
   }
 
   get baseCachePath(): string {

@@ -1,24 +1,32 @@
-import { Platform, Arch } from "electron-builder"
+import { Arch, Platform } from "electron-builder"
 import * as path from "path"
 import { app, copyTestAsset, getFixtureDir } from "../helpers/packTester"
 
 // build in parallel - https://github.com/electron-userland/electron-builder/issues/1340#issuecomment-286061789
-test.ifAll.ifNotCiMac(
-  "portable",
-  app({
+test.ifNotCiMac("portable", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["portable", "nsis"]),
     config: {
       publish: null,
       nsis: {
         differentialPackage: false,
       },
+      electronFuses: {
+        runAsNode: true,
+        enableCookieEncryption: true,
+        enableNodeOptionsEnvironmentVariable: true,
+        enableNodeCliInspectArguments: true,
+        enableEmbeddedAsarIntegrityValidation: true,
+        onlyLoadAppFromAsar: true,
+        loadBrowserProcessSpecificV8Snapshot: true,
+        grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
+      },
     },
   })
 )
 
-test.ifAll.ifDevOrWinCi(
-  "portable zip",
-  app({
+test.ifDevOrWinCi("portable zip", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget("portable"),
     config: {
       publish: null,
@@ -31,9 +39,8 @@ test.ifAll.ifDevOrWinCi(
   })
 )
 
-test.ifAll.ifNotCi(
-  "portable zip several archs",
-  app({
+test.ifNotCi("portable zip several archs", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget("portable", Arch.ia32, Arch.x64),
     config: {
       publish: null,
@@ -46,9 +53,9 @@ test.ifAll.ifNotCi(
   })
 )
 
-test.ifNotCiMac(
-  "portable - artifactName and request execution level",
+test.ifNotCiMac("portable - artifactName and request execution level", ({ expect }) =>
   app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(["portable"]),
       config: {
@@ -73,9 +80,8 @@ test.ifNotCiMac(
   )
 )
 
-test.ifDevOrWinCi(
-  "portable - splashImage",
-  app({
+test.ifDevOrWinCi("portable - splashImage", ({ expect }) =>
+  app(expect, {
     targets: Platform.WINDOWS.createTarget(["portable"]),
     config: {
       publish: null,

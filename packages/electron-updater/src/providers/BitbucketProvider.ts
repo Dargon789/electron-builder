@@ -1,13 +1,17 @@
 import { CancellationToken, BitbucketOptions, newError, UpdateInfo } from "builder-util-runtime"
 import { AppUpdater } from "../AppUpdater"
-import { ResolvedUpdateFileInfo } from "../main"
+import { ResolvedUpdateFileInfo } from "../types"
 import { getChannelFilename, newBaseUrl, newUrlFromBase } from "../util"
 import { parseUpdateInfo, Provider, ProviderRuntimeOptions, resolveFiles } from "./Provider"
 
 export class BitbucketProvider extends Provider<UpdateInfo> {
   private readonly baseUrl: URL
 
-  constructor(private readonly configuration: BitbucketOptions, private readonly updater: AppUpdater, runtimeOptions: ProviderRuntimeOptions) {
+  constructor(
+    private readonly configuration: BitbucketOptions,
+    private readonly updater: AppUpdater,
+    runtimeOptions: ProviderRuntimeOptions
+  ) {
     super({
       ...runtimeOptions,
       isUseMultipleRangeRequest: false,

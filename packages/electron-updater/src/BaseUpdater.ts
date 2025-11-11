@@ -37,6 +37,10 @@ export abstract class BaseUpdater extends AppUpdater {
     })
   }
 
+  protected get installerPath(): string | null {
+    return this.downloadedUpdateHelper == null ? null : this.downloadedUpdateHelper.file
+  }
+
   // must be sync
   protected abstract doInstall(options: InstallOptions): boolean
 
@@ -48,10 +52,10 @@ export abstract class BaseUpdater extends AppUpdater {
     }
 
     const downloadedUpdateHelper = this.downloadedUpdateHelper
-    const installerPath = downloadedUpdateHelper == null ? null : downloadedUpdateHelper.file
+    const installerPath = this.installerPath
     const downloadedFileInfo = downloadedUpdateHelper == null ? null : downloadedUpdateHelper.downloadedFileInfo
     if (installerPath == null || downloadedFileInfo == null) {
-      this.dispatchError(new Error("No valid update available, can't quit and install"))
+      this.dispatchError(new Error("No update filepath provided, can't quit and install"))
       return false
     }
 
@@ -61,7 +65,6 @@ export abstract class BaseUpdater extends AppUpdater {
     try {
       this._logger.info(`Install: isSilent: ${isSilent}, isForceRunAfter: ${isForceRunAfter}`)
       return this.doInstall({
-        installerPath,
         isSilent,
         isForceRunAfter,
         isAdminRightsRequired: downloadedFileInfo.isAdminRightsRequired,
@@ -100,22 +103,6 @@ export abstract class BaseUpdater extends AppUpdater {
     })
   }
 
-  protected wrapSudo() {
-    const { name } = this.app
-    const installComment = `"${name} would like to update"`
-    const sudo = this.spawnSyncLog("which gksudo || which kdesudo || which pkexec || which beesu")
-    const command = [sudo]
-    if (/kdesudo/i.test(sudo)) {
-      command.push("--comment", installComment)
-      command.push("-c")
-    } else if (/gksudo/i.test(sudo)) {
-      command.push("--message", installComment)
-    } else if (/pkexec/i.test(sudo)) {
-      command.push("--disable-internal-agent")
-    }
-    return command.join(" ")
-  }
-
   protected spawnSyncLog(cmd: string, args: string[] = [], env = {}): string {
     this._logger.info(`Executing: ${cmd} with args: ${args}`)
     const response = spawnSync(cmd, args, {
@@ -123,7 +110,17 @@ export abstract class BaseUpdater extends AppUpdater {
       encoding: "utf-8",
       shell: true,
     })
-    return response.stdout.trim()
+
+    const { error, status, stdout, stderr } = response
+    if (error != null) {
+      this._logger.error(stderr)
+      throw error
+    } else if (status != null && status !== 0) {
+      this._logger.error(stderr)
+      throw new Error(`Command ${cmd} exited with code ${status}`)
+    }
+
+    return stdout.trim()
   }
 
   /**
@@ -154,7 +151,6 @@ export abstract class BaseUpdater extends AppUpdater {
 }
 
 export interface InstallOptions {
-  readonly installerPath: string
   readonly isSilent: boolean
   readonly isForceRunAfter: boolean
   readonly isAdminRightsRequired: boolean

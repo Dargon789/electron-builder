@@ -1,10 +1,9 @@
-import BluebirdPromise from "bluebird-lst"
-import { Arch, asArray, deepAssign, InvalidConfigurationError, log } from "builder-util"
-import { copyOrLinkFile, walk } from "builder-util/out/fs"
+import { Arch, asArray, copyOrLinkFile, deepAssign, InvalidConfigurationError, log, walk } from "builder-util"
+import { Nullish } from "builder-util-runtime"
 import { emptyDir, readdir, readFile, writeFile } from "fs-extra"
 import * as path from "path"
 import { AppXOptions } from "../"
-import { getSignVendorPath, isOldWin6 } from "../codeSign/windowsCodeSign"
+import { getSignVendorPath, isOldWin6 } from "../codeSign/windowsSignToolManager"
 import { Target } from "../core"
 import { getTemplatePath } from "../util/pathManager"
 import { VmManager } from "../vm/vm"
@@ -13,19 +12,49 @@ import { createStageDir } from "./targetUtil"
 
 const APPX_ASSETS_DIR_NAME = "appx"
 
-const vendorAssetsForDefaultAssets: { [key: string]: string } = {
+const vendorAssetsForDefaultAssets: Record<string, string> = {
   "StoreLogo.png": "SampleAppx.50x50.png",
   "Square150x150Logo.png": "SampleAppx.150x150.png",
   "Square44x44Logo.png": "SampleAppx.44x44.png",
   "Wide310x150Logo.png": "SampleAppx.310x150.png",
 }
 
+const restrictedApplicationIdValues = [
+  "CON",
+  "PRN",
+  "AUX",
+  "NUL",
+  "COM1",
+  "COM2",
+  "COM3",
+  "COM4",
+  "COM5",
+  "COM6",
+  "COM7",
+  "COM8",
+  "COM9",
+  "LPT1",
+  "LPT2",
+  "LPT3",
+  "LPT4",
+  "LPT5",
+  "LPT6",
+  "LPT7",
+  "LPT8",
+  "LPT9",
+]
+
 const DEFAULT_RESOURCE_LANG = "en-US"
 
 export default class AppXTarget extends Target {
   readonly options: AppXOptions = deepAssign({}, this.packager.platformSpecificBuildOptions, this.packager.config.appx)
 
-  constructor(private readonly packager: WinPackager, readonly outDir: string) {
+  isAsyncSupported = false
+
+  constructor(
+    private readonly packager: WinPackager,
+    readonly outDir: string
+  ) {
     super("appx")
 
     if (process.platform !== "darwin" && (process.platform !== "win32" || isOldWin6())) {
@@ -38,7 +67,7 @@ export default class AppXTarget extends Target {
     const packager = this.packager
     const artifactName = packager.expandArtifactBeautyNamePattern(this.options, "appx", arch)
     const artifactPath = path.join(this.outDir, artifactName)
-    await packager.info.callArtifactBuildStarted({
+    await packager.info.emitArtifactBuildStarted({
       targetPresentableName: "AppX",
       file: artifactPath,
       arch,
@@ -57,13 +86,15 @@ export default class AppXTarget extends Target {
 
     const mappingList: Array<Array<string>> = []
     mappingList.push(
-      await BluebirdPromise.map(walk(appOutDir), file => {
-        let appxPath = file.substring(appOutDir.length + 1)
-        if (path.sep !== "\\") {
-          appxPath = appxPath.replace(/\//g, "\\")
-        }
-        return `"${vm.toVmFile(file)}" "app\\${appxPath}"`
-      })
+      await Promise.all(
+        (await walk(appOutDir)).map(file => {
+          let appxPath = file.substring(appOutDir.length + 1)
+          if (path.sep !== "\\") {
+            appxPath = appxPath.replace(/\//g, "\\")
+          }
+          return `"${vm.toVmFile(file)}" "app\\${appxPath}"`
+        })
+      )
     )
 
     const userAssetDir = await this.packager.getResource(undefined, APPX_ASSETS_DIR_NAME)
@@ -72,7 +103,8 @@ export default class AppXTarget extends Target {
 
     const manifestFile = stageDir.getTempFile("AppxManifest.xml")
     await this.writeManifest(manifestFile, arch, await this.computePublisherName(), userAssets)
-    await packager.info.callAppxManifestCreated(manifestFile)
+
+    await packager.info.emitAppxManifestCreated(manifestFile)
     mappingList.push(assetInfo.mappings)
     mappingList.push([`"${vm.toVmFile(manifestFile)}" "AppxManifest.xml"`])
     const signToolArch = arch === Arch.arm64 ? "x64" : Arch[arch]
@@ -83,7 +115,7 @@ export default class AppXTarget extends Target {
 
       const assetRoot = stageDir.getTempFile("appx/assets")
       await emptyDir(assetRoot)
-      await BluebirdPromise.map(assetInfo.allAssets, it => copyOrLinkFile(it, path.join(assetRoot, path.basename(it))))
+      await Promise.all(assetInfo.allAssets.map(it => copyOrLinkFile(it, path.join(assetRoot, path.basename(it)))))
 
       await vm.exec(makePriPath, [
         "new",
@@ -115,18 +147,20 @@ export default class AppXTarget extends Target {
     if (this.options.makeappxArgs != null) {
       makeAppXArgs.push(...this.options.makeappxArgs)
     }
-    await vm.exec(vm.toVmFile(path.join(vendorPath, "windows-10", signToolArch, "makeappx.exe")), makeAppXArgs)
-    await packager.sign(artifactPath)
+    this.buildQueueManager.add(async () => {
+      await vm.exec(vm.toVmFile(path.join(vendorPath, "windows-10", signToolArch, "makeappx.exe")), makeAppXArgs)
+      await packager.sign(artifactPath)
 
-    await stageDir.cleanup()
+      await stageDir.cleanup()
 
-    await packager.info.callArtifactBuildCompleted({
-      file: artifactPath,
-      packager,
-      arch,
-      safeArtifactName: packager.computeSafeArtifactName(artifactName, "appx"),
-      target: this,
-      isWriteUpdateInfo: this.options.electronUpdaterAware,
+      await packager.info.emitArtifactBuildCompleted({
+        file: artifactPath,
+        packager,
+        arch,
+        safeArtifactName: packager.computeSafeArtifactName(artifactName, "appx"),
+        target: this,
+        isWriteUpdateInfo: this.options.electronUpdaterAware,
+      })
     })
   }
 
@@ -158,17 +192,8 @@ export default class AppXTarget extends Target {
 
   // https://github.com/electron-userland/electron-builder/issues/2108#issuecomment-333200711
   private async computePublisherName() {
-    if ((await this.packager.cscInfo.value) == null) {
-      log.info({ reason: "Windows Store only build" }, "AppX is not signed")
-      return this.options.publisher || "CN=ms"
-    }
-
-    const certInfo = await this.packager.lazyCertInfo.value
-    const publisher = this.options.publisher || (certInfo == null ? null : certInfo.bloodyMicrosoftSubjectDn)
-    if (publisher == null) {
-      throw new Error("Internal error: cannot compute subject using certificate info")
-    }
-    return publisher
+    const signtoolManager = await this.packager.signingManager.value
+    return signtoolManager.computePublisherName(this, this.options.publisher)
   }
 
   private async writeManifest(outFile: string, arch: Arch, publisher: string, userAssets: Array<string>) {
@@ -177,8 +202,14 @@ export default class AppXTarget extends Target {
     const executable = `app\\${appInfo.productFilename}.exe`
     const displayName = options.displayName || appInfo.productName
     const extensions = await this.getExtensions(executable, displayName)
+    const archSpecificMinVersion = arch === Arch.arm64 ? "10.0.16299.0" : "10.0.14316.0"
 
-    const manifest = (await readFile(path.join(getTemplatePath("appx"), "appxmanifest.xml"), "utf8")).replace(/\${([a-zA-Z0-9]+)}/g, (match, p1): string => {
+    const customManifestPath = await this.packager.getResource(this.options.customManifestPath)
+    if (customManifestPath) {
+      log.info({ manifestPath: log.filePath(customManifestPath) }, "custom appx manifest found")
+    }
+    const manifestFileContent = await readFile(customManifestPath || path.join(getTemplatePath("appx"), "appxmanifest.xml"), "utf8")
+    const manifest = manifestFileContent.replace(/\${([a-zA-Z0-9]+)}/g, (match, p1): string => {
       switch (p1) {
         case "publisher":
           return publisher
@@ -195,19 +226,59 @@ export default class AppXTarget extends Target {
           return appInfo.getVersionInWeirdWindowsForm(options.setBuildNumber === true)
 
         case "applicationId": {
-          const result = options.applicationId || options.identityName || appInfo.name
-          if (!isNaN(parseInt(result[0], 10))) {
-            let message = `AppX Application.Id can’t start with numbers: "${result}"`
-            if (options.applicationId == null) {
-              message += `\nPlease set appx.applicationId (or correct appx.identityName or name)`
+          const validCharactersRegex = /^([A-Za-z][A-Za-z0-9]*)(\.[A-Za-z][A-Za-z0-9]*)*$/
+          const identitynumber = parseInt(options.identityName as string, 10) || NaN
+          let result: string
+          if (options.applicationId) {
+            result = options.applicationId
+          } else if (!isNaN(identitynumber) && options.identityName !== null && options.identityName !== undefined) {
+            if (options.identityName[0] === "0") {
+              log.warn(`Remove the 0${identitynumber}`)
+              result = options.identityName.replace("0" + identitynumber.toString(), "")
+            } else {
+              log.warn(`Remove the ${identitynumber}`)
+              result = options.identityName.replace(identitynumber.toString(), "")
             }
+          } else {
+            result = options.identityName || appInfo.name
+          }
+
+          if (result.length < 1 || result.length > 64) {
+            const message = `Appx Application.Id with a value between 1 and 64 characters in length`
+            throw new InvalidConfigurationError(message)
+          } else if (!validCharactersRegex.test(result)) {
+            const message = `AppX Application.Id can not be consists of alpha-numeric and period"`
+            throw new InvalidConfigurationError(message)
+          } else if (restrictedApplicationIdValues.includes(result.toUpperCase())) {
+            const message = `AppX identityName.Id can not include restricted values: ${JSON.stringify(restrictedApplicationIdValues)}`
+            throw new InvalidConfigurationError(message)
+          } else if (result == null && options.applicationId == null) {
+            const message = `Please set appx.applicationId (or correct appx.identityName or name)`
             throw new InvalidConfigurationError(message)
           }
+
           return result
         }
 
-        case "identityName":
-          return options.identityName || appInfo.name
+        case "identityName": {
+          const result = options.identityName || appInfo.name
+          const validCharactersRegex = /^[a-zA-Z0-9.-]+$/
+          if (result.length < 3 || result.length > 50) {
+            const message = `Appx identityName.Id with a value between 3 and 50 characters in length`
+            throw new InvalidConfigurationError(message)
+          } else if (!validCharactersRegex.test(result)) {
+            const message = `AppX identityName.Id cat be consists of alpha-numeric, period, and dash characters"`
+            throw new InvalidConfigurationError(message)
+          } else if (restrictedApplicationIdValues.includes(result.toUpperCase())) {
+            const message = `AppX identityName.Id can not be some values`
+            throw new InvalidConfigurationError(message)
+          } else if (result == null && options.identityName == null) {
+            const message = `Please set appx.identityName or name`
+            throw new InvalidConfigurationError(message)
+          }
+
+          return result
+        }
 
         case "executable":
           return executable
@@ -249,10 +320,10 @@ export default class AppXTarget extends Target {
           return extensions
 
         case "minVersion":
-          return arch === Arch.arm64 ? "10.0.16299.0" : "10.0.14316.0"
+          return options.minVersion || archSpecificMinVersion
 
         case "maxVersionTested":
-          return arch === Arch.arm64 ? "10.0.16299.0" : "10.0.14316.0"
+          return options.maxVersionTested || options.minVersion || archSpecificMinVersion
 
         default:
           throw new Error(`Macro ${p1} is not defined`)
@@ -320,7 +391,7 @@ export default class AppXTarget extends Target {
 }
 
 // get the resource - language tag, see https://docs.microsoft.com/en-us/windows/uwp/globalizing/manage-language-and-region#specify-the-supported-languages-in-the-apps-manifest
-function resourceLanguageTag(userLanguages: Array<string> | null | undefined): string {
+function resourceLanguageTag(userLanguages: Array<string> | Nullish): string {
   if (userLanguages == null || userLanguages.length === 0) {
     userLanguages = [DEFAULT_RESOURCE_LANG]
   }

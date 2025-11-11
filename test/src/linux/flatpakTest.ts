@@ -1,26 +1,26 @@
 import { Platform } from "electron-builder"
 import { app } from "../helpers/packTester"
 
-if (process.env.FLATPAK_TEST === "false") {
-  fit("Skip flatpakTest suite — FLATPAK_TEST is set to false or Windows", () => {
-    console.warn("[SKIP] Skip flatpakTest suite — FLATPAK_TEST is set to false")
-  })
-} else if (process.platform === "win32") {
-  fit("Skip flatpakTest suite — Windows is not supported", () => {
-    console.warn("[SKIP] Skip flatpakTest suite — Windows is not supported")
-  })
-}
-
-test.ifAll.ifDevOrLinuxCi(
-  "flatpak",
-  app({
+test.ifDevOrLinuxCi("flatpak", ({ expect }) =>
+  app(expect, {
     targets: Platform.LINUX.createTarget("flatpak"),
+    config: {
+      electronFuses: {
+        runAsNode: true,
+        enableCookieEncryption: true,
+        enableNodeOptionsEnvironmentVariable: true,
+        enableNodeCliInspectArguments: true,
+        enableEmbeddedAsarIntegrityValidation: true,
+        onlyLoadAppFromAsar: true,
+        loadBrowserProcessSpecificV8Snapshot: true,
+        grantFileProtocolExtraPrivileges: undefined, // unsupported on current electron version in our tests
+      },
+    },
   })
 )
 
-test.ifAll.ifDevOrLinuxCi(
-  "enable Wayland flags",
-  app({
+test.ifDevOrLinuxCi("enable Wayland flags", ({ expect }) =>
+  app(expect, {
     targets: Platform.LINUX.createTarget("flatpak"),
     config: {
       flatpak: {
@@ -30,9 +30,8 @@ test.ifAll.ifDevOrLinuxCi(
   })
 )
 
-test.ifAll.ifDevOrLinuxCi(
-  "custom finishArgs",
-  app({
+test.ifDevOrLinuxCi("custom finishArgs", ({ expect }) =>
+  app(expect, {
     targets: Platform.LINUX.createTarget("flatpak"),
     config: {
       flatpak: {
@@ -54,9 +53,8 @@ test.ifAll.ifDevOrLinuxCi(
   })
 )
 
-test.ifAll.ifDevOrLinuxCi(
-  "custom runtime and base app version",
-  app({
+test.ifDevOrLinuxCi("custom runtime and base app version", ({ expect }) =>
+  app(expect, {
     targets: Platform.LINUX.createTarget("flatpak"),
     config: {
       flatpak: {

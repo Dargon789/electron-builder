@@ -1,25 +1,11 @@
-import { Arch } from "builder-util"
-import { BitbucketOptions, CancellationToken, HttpError, KeygenOptions, S3Options, SpacesOptions } from "builder-util-runtime"
-import { PublishContext } from "electron-publish"
-import { GitHubPublisher } from "electron-publish/out/gitHubPublisher"
-import { isCI as isCi } from "ci-info"
-import * as path from "path"
-import { KeygenPublisher } from "app-builder-lib/out/publish/KeygenPublisher"
 import { Platform } from "app-builder-lib"
 import { createPublisher } from "app-builder-lib/out/publish/PublishManager"
-import { BitbucketPublisher } from "app-builder-lib/out/publish/BitbucketPublisher"
-
-if (isCi && process.platform === "win32") {
-  fit("Skip ArtifactPublisherTest suite on Windows CI", () => {
-    console.warn("[SKIP] Skip ArtifactPublisherTest suite on Windows CI")
-  })
-}
-
-if (process.env.ELECTRON_BUILDER_OFFLINE === "true") {
-  fit("Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined", () => {
-    console.warn("[SKIP] Skip ArtifactPublisherTest suite — ELECTRON_BUILDER_OFFLINE is defined")
-  })
-}
+import { Arch } from "builder-util"
+import { BitbucketOptions, CancellationToken, HttpError, KeygenOptions, S3Options, SpacesOptions } from "builder-util-runtime"
+import { publishArtifactsWithOptions } from "electron-builder"
+import { BitbucketPublisher, GitHubPublisher, KeygenPublisher, PublishContext } from "electron-publish"
+import * as path from "path"
+import { ExpectStatic } from "vitest"
 
 function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
@@ -39,7 +25,7 @@ const publishContext: PublishContext = {
   progress: null,
 }
 
-test("GitHub unauthorized", async () => {
+test("GitHub unauthorized", async ({ expect }) => {
   try {
     await new GitHubPublisher(publishContext, { provider: "github", owner: "actperepo", repo: "ecb2", token: "incorrect token" }, versionNumber())._release.value
   } catch (e: any) {
@@ -59,10 +45,10 @@ function isApiRateError(e: Error): boolean {
   }
 }
 
-function testAndIgnoreApiRate(name: string, testFunction: () => Promise<any>) {
-  test.skip(name, async () => {
+function testAndIgnoreApiRate(name: string, testFunction: (expect: ExpectStatic) => Promise<any>) {
+  test.skip(name, async ({ expect }) => {
     try {
-      await testFunction()
+      await testFunction(expect)
     } catch (e: any) {
       if (isApiRateError(e)) {
         console.warn(e.description.message)
@@ -85,10 +71,10 @@ testAndIgnoreApiRate("GitHub upload", async () => {
 })
 
 test.ifEnv(process.env.AWS_ACCESS_KEY_ID != null && process.env.AWS_SECRET_ACCESS_KEY != null)("S3 upload", async () => {
-  const publisher = createPublisher(publishContext, "0.0.1", { provider: "s3", bucket: "electron-builder-test" } as S3Options, {}, {} as any)!
-  await publisher.upload({ file: iconPath, arch: Arch.x64 })
+  const publisher = await createPublisher(publishContext, "0.0.1", { provider: "s3", bucket: "electron-builder-test" } as S3Options, {}, {} as any)
+  await publisher!.upload({ file: iconPath, arch: Arch.x64 })
   // test overwrite
-  await publisher.upload({ file: iconPath, arch: Arch.x64 })
+  await publisher!.upload({ file: iconPath, arch: Arch.x64 })
 })
 
 test.ifEnv(process.env.DO_KEY_ID != null && process.env.DO_SECRET_KEY != null)("DO upload", async () => {
@@ -97,13 +83,13 @@ test.ifEnv(process.env.DO_KEY_ID != null && process.env.DO_SECRET_KEY != null)("
     name: "electron-builder-test",
     region: "nyc3",
   }
-  const publisher = createPublisher(publishContext, "0.0.1", configuration, {}, {} as any)!
-  await publisher.upload({ file: iconPath, arch: Arch.x64 })
+  const publisher = await createPublisher(publishContext, "0.0.1", configuration, {}, {} as any)
+  await publisher!.upload({ file: iconPath, arch: Arch.x64 })
   // test overwrite
-  await publisher.upload({ file: iconPath, arch: Arch.x64 })
+  await publisher!.upload({ file: iconPath, arch: Arch.x64 })
 })
 
-testAndIgnoreApiRate("prerelease", async () => {
+testAndIgnoreApiRate("prerelease", async expect => {
   const publisher = new GitHubPublisher(publishContext, { provider: "github", owner: "actperepo", repo: "ecb2", token, releaseType: "prerelease" }, versionNumber())
   try {
     await publisher.upload({ file: iconPath, arch: Arch.x64 })
@@ -150,17 +136,23 @@ test.ifEnv(process.env.KEYGEN_TOKEN)("Keygen upload", async () => {
 
 test.ifEnv(process.env.BITBUCKET_TOKEN)("Bitbucket upload", async () => {
   const timeout = 0
-  const publisher = new BitbucketPublisher(publishContext, {
+  const config: BitbucketOptions = {
     provider: "bitbucket",
     owner: "mike-m",
     slug: "electron-builder-test",
     timeout,
-  } as BitbucketOptions)
+  }
+  const publisher = new BitbucketPublisher(publishContext, config)
   const filename = await publisher.upload({ file: iconPath, arch: Arch.x64, timeout })
   await publisher.deleteRelease(filename)
+
+  const uploadTasks: any = await publishArtifactsWithOptions([{ file: icoPath, arch: null }], undefined, undefined, [config])
+  for (const task of uploadTasks) {
+    await publisher.deleteRelease(task.file)
+  }
 })
 
-test.ifEnv(process.env.BITBUCKET_TOKEN)("Bitbucket upload", async () => {
+test.ifEnv(process.env.BITBUCKET_TOKEN)("Bitbucket upload", async ({ expect }) => {
   const timeout = 100
   const publisher = new BitbucketPublisher(publishContext, {
     provider: "bitbucket",

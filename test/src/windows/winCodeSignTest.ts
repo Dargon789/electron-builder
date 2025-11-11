@@ -1,12 +1,13 @@
+import { parseDn } from "builder-util-runtime"
 import { DIR_TARGET, Platform } from "electron-builder"
 import { outputFile } from "fs-extra"
+import { load } from "js-yaml"
 import * as path from "path"
 import { CheckingWinPackager } from "../helpers/CheckingPackager"
 import { app, appThrows } from "../helpers/packTester"
-import { parseDn } from "builder-util-runtime"
-import { load } from "js-yaml"
+import { ExpectStatic } from "vitest"
 
-test("parseDn", () => {
+test("parseDn", ({ expect }) => {
   expect(parseDn("CN=7digital Limited, O=7digital Limited, L=London, C=GB")).toMatchSnapshot()
 
   expect(load("publisherName:\n  - 7digital Limited")).toMatchObject({ publisherName: ["7digital Limited"] })
@@ -14,9 +15,9 @@ test("parseDn", () => {
 
 const windowsDirTarget = Platform.WINDOWS.createTarget(["dir"])
 
-test.ifNotCiMac(
-  "sign nested asar unpacked executables",
+test("sign nested asar unpacked executables", ({ expect }) =>
   appThrows(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(DIR_TARGET),
       config: {
@@ -30,20 +31,27 @@ test.ifNotCiMac(
         await outputFile(path.join(projectDir, "assets", "nested", "nested", "file.exe"), "invalid PE file")
       },
     },
-    error => expect(error.message).toContain("This file format cannot be signed because it is not recognized.")
-  )
-)
+    error => {
+      if (process.platform === "win32") {
+        expect(error.message).toContain("This file format cannot be signed because it is not recognized.")
+      } else {
+        expect(error.message).toContain("Unrecognized file type")
+      }
+    }
+  ))
 
-function testCustomSign(sign: any) {
-  return app({
+function testCustomSign(expect: ExpectStatic, sign: any) {
+  return app(expect, {
     targets: Platform.WINDOWS.createTarget(DIR_TARGET),
     platformPackagerFactory: (packager, platform) => new CheckingWinPackager(packager),
     config: {
       win: {
-        certificatePassword: "pass",
-        certificateFile: "secretFile",
-        sign,
-        signingHashAlgorithms: ["sha256"],
+        signtoolOptions: {
+          certificatePassword: "pass",
+          certificateFile: "secretFile",
+          sign,
+          signingHashAlgorithms: ["sha256"],
+        },
         // to be sure that sign code will be executed
         forceCodeSigning: true,
       },
@@ -51,22 +59,18 @@ function testCustomSign(sign: any) {
   })
 }
 
-test.ifAll.ifNotCiMac(
-  "certificateFile/password - sign as async/await",
-  testCustomSign(async () => {
-    return
-  })
-)
-test.ifAll.ifNotCiMac(
-  "certificateFile/password - sign as Promise",
-  testCustomSign(() => Promise.resolve())
-)
-test.ifAll.ifNotCiMac("certificateFile/password - sign as function", testCustomSign(require("../helpers/customWindowsSign").default))
-test.ifAll.ifNotCiMac("certificateFile/password - sign as path", testCustomSign(path.join(__dirname, "../helpers/customWindowsSign")))
+test("certificateFile/password - sign as async/await", ({ expect }) =>
+  testCustomSign(expect, async () => {
+    return Promise.resolve()
+  }))
+test("certificateFile/password - sign as Promise", ({ expect }) => testCustomSign(expect, () => Promise.resolve()))
+test("certificateFile/password - sign as function", async ({ expect }) => testCustomSign(expect, (await import("../helpers/customWindowsSign")).default))
+test("certificateFile/password - sign as path", ({ expect }) => testCustomSign(expect, path.join(__dirname, "../helpers/customWindowsSign.mjs")))
 
-test.ifAll.ifNotCiMac("custom sign if no code sign info", () => {
+test("custom sign if no code sign info", ({ expect }) => {
   let called = false
   return app(
+    expect,
     {
       targets: Platform.WINDOWS.createTarget(DIR_TARGET),
       platformPackagerFactory: (packager, platform) => new CheckingWinPackager(packager),
@@ -74,8 +78,10 @@ test.ifAll.ifNotCiMac("custom sign if no code sign info", () => {
         win: {
           // to be sure that sign code will be executed
           forceCodeSigning: true,
-          sign: async () => {
-            called = true
+          signtoolOptions: {
+            sign: async () => {
+              called = true
+            },
           },
         },
       },
@@ -85,25 +91,59 @@ test.ifAll.ifNotCiMac("custom sign if no code sign info", () => {
         expect(called).toBe(true)
       },
     }
-  )()
+  )
 })
 
-test.ifAll.ifNotCiMac(
-  "forceCodeSigning",
-  appThrows({
+test("forceCodeSigning", ({ expect }) =>
+  appThrows(expect, {
     targets: windowsDirTarget,
     config: {
       forceCodeSigning: true,
     },
-  })
-)
+  }))
 
-test.ifAll.ifNotCiMac(
-  "electronDist",
-  appThrows({
-    targets: Platform.WINDOWS.createTarget(DIR_TARGET),
-    config: {
-      electronDist: "foo",
+test("electronDist", ({ expect }) =>
+  appThrows(
+    expect,
+    {
+      targets: windowsDirTarget,
+      config: {
+        electronDist: "foo",
+      },
     },
-  })
+    {},
+    error => expect(error.message).toContain("Please provide a valid path to the Electron zip file, cache directory, or electron build directory.")
+  ))
+
+test("azure signing without credentials", ({ expect }) =>
+  appThrows(
+    expect,
+    {
+      targets: windowsDirTarget,
+      config: {
+        forceCodeSigning: true,
+        win: {
+          azureSignOptions: {
+            publisherName: "test",
+            endpoint: "https://weu.codesigning.azure.net/",
+            certificateProfileName: "profilenamehere",
+            codeSigningAccountName: "codesigningnamehere",
+          },
+        },
+      },
+    },
+    {},
+    error => expect(error.message).toContain("Unable to find valid azure env field AZURE_TENANT_ID for signing.")
+  ))
+
+test.ifNotWindows("win code sign using pwsh", ({ expect }) =>
+  app(
+    expect,
+    {
+      targets: Platform.WINDOWS.createTarget(DIR_TARGET),
+    },
+    {
+      signedWin: true,
+    }
+  )
 )

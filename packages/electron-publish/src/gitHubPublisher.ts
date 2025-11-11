@@ -1,12 +1,12 @@
-import { Arch, InvalidConfigurationError, isEmptyOrSpaces, isEnvTrue, isTokenCharValid, log } from "builder-util"
-import { configureRequestOptions, GithubOptions, HttpError, parseJson } from "builder-util-runtime"
-import { Fields } from "builder-util/out/log"
-import { httpExecutor } from "builder-util/out/nodeHttpExecutor"
+import { Arch, Fields, httpExecutor, InvalidConfigurationError, isEmptyOrSpaces, isEnvTrue, isTokenCharValid, log } from "builder-util"
+import { configureRequestOptions, GithubOptions, HttpError, parseJson, githubTagPrefix } from "builder-util-runtime"
 import { ClientRequest } from "http"
 import { Lazy } from "lazy-val"
 import * as mime from "mime"
 import { parse as parseUrl, UrlWithStringQuery } from "url"
-import { getCiTag, HttpPublisher, PublishContext, PublishOptions } from "./publisher"
+import { HttpPublisher } from "./httpPublisher"
+import { PublishContext, PublishOptions } from "./index"
+import { getCiTag } from "./publisher"
 
 export interface Release {
   id: number
@@ -37,12 +37,17 @@ export class GitHubPublisher extends HttpPublisher {
 
   private releaseLogFields: Fields | null = null
 
-  constructor(context: PublishContext, private readonly info: GithubOptions, private readonly version: string, private readonly options: PublishOptions = {}) {
+  constructor(
+    context: PublishContext,
+    private readonly info: GithubOptions,
+    private readonly version: string,
+    private readonly options: PublishOptions = {}
+  ) {
     super(context, true)
 
     let token = info.token
-    if (isEmptyOrSpaces(token)) {
-      token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
+    if (isEmptyOrSpaces(token) || process.env.GITHUB_RELEASE_TOKEN) {
+      token = process.env.GITHUB_RELEASE_TOKEN ? process.env.GITHUB_RELEASE_TOKEN : process.env.GH_TOKEN || process.env.GITHUB_TOKEN
       if (isEmptyOrSpaces(token)) {
         throw new InvalidConfigurationError(`GitHub Personal Access Token is not set, neither programmatically, nor using env "GH_TOKEN"`)
       }
@@ -60,7 +65,7 @@ export class GitHubPublisher extends HttpPublisher {
       throw new InvalidConfigurationError(`Version must not start with "v": ${version}`)
     }
 
-    this.tag = info.vPrefixedTagName === false ? version : `v${version}`
+    this.tag = githubTagPrefix(info) + version
 
     if (isEnvTrue(process.env.EP_DRAFT)) {
       this.releaseType = "draft"

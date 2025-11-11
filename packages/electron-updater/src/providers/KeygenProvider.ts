@@ -1,18 +1,24 @@
 import { CancellationToken, KeygenOptions, newError, UpdateInfo } from "builder-util-runtime"
 import { AppUpdater } from "../AppUpdater"
-import { ResolvedUpdateFileInfo } from "../main"
+import { ResolvedUpdateFileInfo } from "../types"
 import { getChannelFilename, newBaseUrl, newUrlFromBase } from "../util"
 import { parseUpdateInfo, Provider, ProviderRuntimeOptions, resolveFiles } from "./Provider"
 
 export class KeygenProvider extends Provider<UpdateInfo> {
+  private readonly defaultHostname = "api.keygen.sh"
   private readonly baseUrl: URL
 
-  constructor(private readonly configuration: KeygenOptions, private readonly updater: AppUpdater, runtimeOptions: ProviderRuntimeOptions) {
+  constructor(
+    private readonly configuration: KeygenOptions,
+    private readonly updater: AppUpdater,
+    runtimeOptions: ProviderRuntimeOptions
+  ) {
     super({
       ...runtimeOptions,
       isUseMultipleRangeRequest: false,
     })
-    this.baseUrl = newBaseUrl(`https://api.keygen.sh/v1/accounts/${this.configuration.account}/artifacts?product=${this.configuration.product}`)
+    const host = this.configuration.host || this.defaultHostname
+    this.baseUrl = newBaseUrl(`https://${host}/v1/accounts/${this.configuration.account}/artifacts?product=${this.configuration.product}`)
   }
 
   private get channel(): string {

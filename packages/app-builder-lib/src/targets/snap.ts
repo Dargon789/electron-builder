@@ -1,16 +1,16 @@
-import { Arch, deepAssign, executeAppBuilder, InvalidConfigurationError, log, replaceDefault as _replaceDefault, serializeToYaml, toLinuxArchString } from "builder-util"
-import { SnapStoreOptions, asArray } from "builder-util-runtime"
+import { replaceDefault as _replaceDefault, Arch, deepAssign, executeAppBuilder, InvalidConfigurationError, log, serializeToYaml, toLinuxArchString } from "builder-util"
+import { asArray, Nullish, SnapStoreOptions } from "builder-util-runtime"
 import { outputFile, readFile } from "fs-extra"
 import { load } from "js-yaml"
 import * as path from "path"
 import * as semver from "semver"
+import { Configuration } from "../configuration"
 import { Publish, Target } from "../core"
 import { LinuxPackager } from "../linuxPackager"
 import { PlugDescriptor, SnapOptions } from "../options/SnapOptions"
 import { getTemplatePath } from "../util/pathManager"
 import { LinuxTargetHelper } from "./LinuxTargetHelper"
 import { createStageDirPath } from "./targetUtil"
-import { Configuration } from "../configuration"
 
 const defaultPlugs = ["desktop", "desktop-legacy", "home", "x11", "wayland", "unity7", "browser-support", "network", "gsettings", "audio-playback", "pulseaudio", "opengl"]
 
@@ -19,11 +19,16 @@ export default class SnapTarget extends Target {
 
   public isUseTemplateApp = false
 
-  constructor(name: string, private readonly packager: LinuxPackager, private readonly helper: LinuxTargetHelper, readonly outDir: string) {
+  constructor(
+    name: string,
+    private readonly packager: LinuxPackager,
+    private readonly helper: LinuxTargetHelper,
+    readonly outDir: string
+  ) {
     super(name)
   }
 
-  private replaceDefault(inList: Array<string> | null | undefined, defaultList: Array<string>) {
+  private replaceDefault(inList: Array<string> | Nullish, defaultList: Array<string>) {
     const result = _replaceDefault(inList, defaultList)
     if (result !== defaultList) {
       this.isUseTemplateApp = false
@@ -175,7 +180,7 @@ export default class SnapTarget extends Target {
     // tslint:disable-next-line:no-invalid-template-strings
     const artifactName = packager.expandArtifactNamePattern(this.options, "snap", arch, "${name}_${version}_${arch}.${ext}", false)
     const artifactPath = path.join(this.outDir, artifactName)
-    await packager.info.callArtifactBuildStarted({
+    await packager.info.emitArtifactBuildStarted({
       targetPresentableName: "snap",
       file: artifactPath,
       arch,
@@ -248,13 +253,13 @@ export default class SnapTarget extends Target {
 
     const publishConfig = findSnapPublishConfig(this.packager.config)
 
-    await packager.info.callArtifactBuildCompleted({
+    await packager.info.emitArtifactBuildCompleted({
       file: artifactPath,
       safeArtifactName: packager.computeSafeArtifactName(artifactName, "snap", arch, false),
       target: this,
       arch,
       packager,
-      publishConfig: publishConfig == null ? { provider: "snapStore" } : publishConfig,
+      publishConfig,
     })
   }
 
@@ -264,8 +269,14 @@ export default class SnapTarget extends Target {
 }
 
 function findSnapPublishConfig(config?: Configuration): SnapStoreOptions | null {
+  const fallback: SnapStoreOptions = { provider: "snapStore" }
+
   if (!config) {
-    return null
+    return fallback
+  }
+
+  if (config.snap?.publish) {
+    return findSnapPublishConfigInPublishNode(config.snap.publish)
   }
 
   if (config.linux?.publish) {
@@ -284,7 +295,7 @@ function findSnapPublishConfig(config?: Configuration): SnapStoreOptions | null 
     }
   }
 
-  return null
+  return fallback
 }
 
 function findSnapPublishConfigInPublishNode(configPublishNode: Publish): SnapStoreOptions | null {
@@ -337,7 +348,7 @@ function isArrayEqualRegardlessOfSort(a: Array<string>, b: Array<string>) {
   return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
-function normalizePlugConfiguration(raw: Array<string | PlugDescriptor> | PlugDescriptor | null | undefined): { [key: string]: { [name: string]: any } | null } | null {
+function normalizePlugConfiguration(raw: Array<string | PlugDescriptor> | PlugDescriptor | Nullish): Record<string, Record<string, any> | null> | null {
   if (raw == null) {
     return null
   }

@@ -1,5 +1,5 @@
-import { Arch, archFromString, ArchType } from "builder-util"
-import { AllPublishOptions } from "builder-util-runtime"
+import { Arch, archFromString, ArchType, AsyncTaskManager } from "builder-util"
+import { AllPublishOptions, CancellationToken, Nullish } from "builder-util-runtime"
 
 // https://github.com/YousefED/typescript-json-schema/issues/80
 export type Publish = AllPublishOptions | Array<AllPublishOptions> | null
@@ -23,7 +23,11 @@ export class Platform {
   static LINUX = new Platform("linux", "linux", "linux")
   static WINDOWS = new Platform("windows", "win", "win32")
 
-  constructor(public name: string, public buildConfigurationKey: string, public nodeName: NodeJS.Platform) {}
+  constructor(
+    public name: string,
+    public buildConfigurationKey: string,
+    public nodeName: NodeJS.Platform
+  ) {}
 
   toString() {
     return this.name
@@ -69,9 +73,15 @@ export class Platform {
 
 export abstract class Target {
   abstract readonly outDir: string
-  abstract readonly options: TargetSpecificOptions | null | undefined
+  abstract readonly options: TargetSpecificOptions | Nullish
 
-  protected constructor(readonly name: string, readonly isAsyncSupported: boolean = true) {}
+  // use only for tasks that cannot be executed in parallel (such as signing on windows and hdiutil on macOS due to file locking)
+  readonly buildQueueManager = new AsyncTaskManager(new CancellationToken())
+
+  protected constructor(
+    readonly name: string,
+    readonly isAsyncSupported: boolean = true
+  ) {}
 
   async checkOptions(): Promise<any> {
     // ignore
@@ -79,14 +89,14 @@ export abstract class Target {
 
   abstract build(appOutDir: string, arch: Arch): Promise<any>
 
-  finishBuild(): Promise<any> {
-    return Promise.resolve()
+  async finishBuild(): Promise<any> {
+    await this.buildQueueManager.awaitTasks()
   }
 }
 
 export interface TargetSpecificOptions {
   /**
-   The [artifact file name template](/configuration/configuration#artifact-file-name-template).
+   The [artifact file name template](./configuration.md#artifact-file-name-template).
    */
   readonly artifactName?: string | null
 

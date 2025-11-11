@@ -1,50 +1,78 @@
-import BluebirdPromise from "bluebird-lst"
-import { deepAssign, Arch, AsyncTaskManager, exec, InvalidConfigurationError, log, use, getArchSuffix } from "builder-util"
-import { signAsync } from "@electron/osx-sign"
+import { notarize } from "@electron/notarize"
+import { NotarizeOptionsNotaryTool, NotaryToolKeychainCredentials } from "@electron/notarize/lib/types"
 import { PerFileSignOptions, SignOptions } from "@electron/osx-sign/dist/cjs/types"
+import { Identity } from "@electron/osx-sign/dist/cjs/util-identities"
+import {
+  Arch,
+  AsyncTaskManager,
+  copyFile,
+  deepAssign,
+  exec,
+  exists,
+  getArchSuffix,
+  InvalidConfigurationError,
+  log,
+  orIfFileNotExist,
+  statOrNull,
+  unlinkIfExists,
+  use,
+} from "builder-util"
+import { MemoLazy, Nullish } from "builder-util-runtime"
+import * as fs from "fs/promises"
 import { mkdir, readdir } from "fs/promises"
 import { Lazy } from "lazy-val"
 import * as path from "path"
-import { copyFile, statOrNull, unlinkIfExists } from "builder-util/out/fs"
-import { orIfFileNotExist } from "builder-util/out/promise"
 import { AppInfo } from "./appInfo"
-import { CertType, CodeSigningInfo, createKeychain, findIdentity, Identity, isSignAllowed, removeKeychain, reportError } from "./codeSign/macCodeSign"
+import { CertType, CodeSigningInfo, createKeychain, CreateKeychainOptions, findIdentity, isSignAllowed, removeKeychain, reportError, sign } from "./codeSign/macCodeSign"
 import { DIR_TARGET, Platform, Target } from "./core"
 import { AfterPackContext, ElectronPlatformName } from "./index"
-import { MacConfiguration, MasConfiguration, NotarizeLegacyOptions, NotarizeNotaryOptions } from "./options/macOptions"
+import { MacConfiguration, MasConfiguration } from "./options/macOptions"
 import { Packager } from "./packager"
-import { chooseNotNull, PlatformPackager } from "./platformPackager"
+import { chooseNotNull, DoPackOptions, PlatformPackager } from "./platformPackager"
 import { ArchiveTarget } from "./targets/ArchiveTarget"
 import { PkgTarget, prepareProductBuildArgs } from "./targets/pkg"
 import { createCommonTarget, NoOpTarget } from "./targets/targetFactory"
 import { isMacOsHighSierra } from "./util/macosVersion"
 import { getTemplatePath } from "./util/pathManager"
-import * as fs from "fs/promises"
-import { notarize, NotarizeOptions } from "@electron/notarize"
-import { LegacyNotarizePasswordCredentials, LegacyNotarizeStartOptions, NotaryToolStartOptions, NotaryToolCredentials } from "@electron/notarize/lib/types"
+import { resolveFunction } from "./util/resolve"
+import { expandMacro as doExpandMacro } from "./util/macroExpander"
 
-export default class MacPackager extends PlatformPackager<MacConfiguration> {
-  readonly codeSigningInfo = new Lazy<CodeSigningInfo>(() => {
-    const cscLink = this.getCscLink()
-    if (cscLink == null || process.platform !== "darwin") {
+export type CustomMacSignOptions = SignOptions
+export type CustomMacSign = (configuration: CustomMacSignOptions, packager: MacPackager) => Promise<void>
+
+export class MacPackager extends PlatformPackager<MacConfiguration> {
+  readonly codeSigningInfo = new MemoLazy<CreateKeychainOptions | null, CodeSigningInfo>(
+    () => {
+      const cscLink = this.getCscLink()
+      if (cscLink == null || process.platform !== "darwin") {
+        return null
+      }
+
+      const selected = {
+        tmpDir: this.info.tempDirManager,
+        cscLink,
+        cscKeyPassword: this.getCscPassword(),
+        cscILink: chooseNotNull(this.platformSpecificBuildOptions.cscInstallerLink, process.env.CSC_INSTALLER_LINK),
+        cscIKeyPassword: chooseNotNull(this.platformSpecificBuildOptions.cscInstallerKeyPassword, process.env.CSC_INSTALLER_KEY_PASSWORD),
+        currentDir: this.projectDir,
+      }
+
+      return selected
+    },
+    async selected => {
+      if (selected) {
+        return createKeychain(selected).then(result => {
+          const keychainFile = result.keychainFile
+          if (keychainFile != null) {
+            this.info.disposeOnBuildFinish(() => removeKeychain(keychainFile))
+          }
+          return result
+        })
+      }
+
       return Promise.resolve({ keychainFile: process.env.CSC_KEYCHAIN || null })
     }
-
-    return createKeychain({
-      tmpDir: this.info.tempDirManager,
-      cscLink,
-      cscKeyPassword: this.getCscPassword(),
-      cscILink: chooseNotNull(this.platformSpecificBuildOptions.cscInstallerLink, process.env.CSC_INSTALLER_LINK),
-      cscIKeyPassword: chooseNotNull(this.platformSpecificBuildOptions.cscInstallerKeyPassword, process.env.CSC_INSTALLER_KEY_PASSWORD),
-      currentDir: this.projectDir,
-    }).then(result => {
-      const keychainFile = result.keychainFile
-      if (keychainFile != null) {
-        this.info.disposeOnBuildFinish(() => removeKeychain(keychainFile))
-      }
-      return result
-    })
-  })
+  )
 
   private _iconPath = new Lazy(() => this.getOrConvertIcon("icns"))
 
@@ -54,6 +82,15 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
 
   get defaultTarget(): Array<string> {
     return this.info.framework.macOsDefaultTargets
+  }
+
+  expandArch(pattern: string, arch?: Arch | null): string[] {
+    if (arch === Arch.universal) {
+      // Universal build has `app-x64.asar.unpacked` & `app-arm64.asar.unpacked`
+      return [doExpandMacro(pattern, Arch[Arch.arm64], this.appInfo, {}, false), doExpandMacro(pattern, Arch[Arch.x64], this.appInfo, {}, false)]
+    }
+    // Every other build keeps the name as `app.asar.unpacked`
+    return [doExpandMacro(pattern, null, this.appInfo, {}, false)]
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -73,7 +110,6 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
           break
 
         case "dmg": {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { DmgTarget } = require("dmg-builder")
           mapper(name, outDir => new DmgTarget(this, outDir))
           break
@@ -95,27 +131,40 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     }
   }
 
-  protected async doPack(
-    outDir: string,
-    appOutDir: string,
-    platformName: ElectronPlatformName,
-    arch: Arch,
-    platformSpecificBuildOptions: MacConfiguration,
-    targets: Array<Target>
-  ): Promise<any> {
+  protected async doPack(config: DoPackOptions<MacConfiguration>): Promise<any> {
+    const { outDir, appOutDir, platformName, arch, platformSpecificBuildOptions, targets } = config
+
     switch (arch) {
       default: {
-        return super.doPack(outDir, appOutDir, platformName, arch, platformSpecificBuildOptions, targets)
+        return super.doPack(config)
       }
       case Arch.universal: {
         const outDirName = (arch: Arch) => `${appOutDir}-${Arch[arch]}-temp`
+        const options = {
+          ...config,
+          options: {
+            sign: false,
+            disableAsarIntegrity: true,
+            disableFuses: true,
+          },
+        }
 
         const x64Arch = Arch.x64
         const x64AppOutDir = outDirName(x64Arch)
-        await super.doPack(outDir, x64AppOutDir, platformName, x64Arch, platformSpecificBuildOptions, targets, false, true)
+        await super.doPack({ ...options, appOutDir: x64AppOutDir, arch: x64Arch })
+
+        if (this.info.cancellationToken.cancelled) {
+          return
+        }
+
         const arm64Arch = Arch.arm64
         const arm64AppOutPath = outDirName(arm64Arch)
-        await super.doPack(outDir, arm64AppOutPath, platformName, arm64Arch, platformSpecificBuildOptions, targets, false, true)
+        await super.doPack({ ...options, appOutDir: arm64AppOutPath, arch: arm64Arch })
+
+        if (this.info.cancellationToken.cancelled) {
+          return
+        }
+
         const framework = this.info.framework
         log.info(
           {
@@ -127,6 +176,14 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
           `packaging`
         )
         const appFile = `${this.appInfo.productFilename}.app`
+
+        // Make sure the Assets.car file is the same for both architectures
+        const sourceCatalogPath = path.join(x64AppOutDir, appFile, "Contents/Resources/Assets.car")
+        if (await exists(sourceCatalogPath)) {
+          const targetCatalogPath = path.join(arm64AppOutPath, appFile, "Contents/Resources/Assets.car")
+          await fs.copyFile(sourceCatalogPath, targetCatalogPath)
+        }
+
         const { makeUniversalApp } = require("@electron/universal")
         await makeUniversalApp({
           x64AppPath: path.join(x64AppOutDir, appFile),
@@ -149,7 +206,13 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
           packager: this,
           electronPlatformName: platformName,
         }
-        await this.info.afterPack(packContext)
+        await this.info.emitAfterPack(packContext)
+
+        if (this.info.cancellationToken.cancelled) {
+          return
+        }
+
+        await this.doAddElectronFuses(packContext)
 
         await this.doSignAfterPack(outDir, appOutDir, platformName, arch, platformSpecificBuildOptions, targets)
         break
@@ -176,7 +239,7 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
 
       const targetOutDir = path.join(outDir, `${targetName}${getArchSuffix(arch, this.platformSpecificBuildOptions.defaultArch)}`)
       if (prepackaged == null) {
-        await this.doPack(outDir, targetOutDir, "mas", arch, masBuildOptions, [target])
+        await this.doPack({ outDir, appOutDir: targetOutDir, platformName: "mas", arch, platformSpecificBuildOptions: masBuildOptions, targets: [target] })
         await this.sign(path.join(targetOutDir, `${this.appInfo.productFilename}.app`), targetOutDir, masBuildOptions, arch)
       } else {
         await this.sign(prepackaged, targetOutDir, masBuildOptions, arch)
@@ -186,13 +249,20 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     if (!hasMas || targets.length > 1) {
       const appPath = prepackaged == null ? path.join(this.computeAppOutDir(outDir, arch), `${this.appInfo.productFilename}.app`) : prepackaged
       if (prepackaged == null) {
-        await this.doPack(outDir, path.dirname(appPath), this.platform.nodeName as ElectronPlatformName, arch, this.platformSpecificBuildOptions, targets)
+        await this.doPack({
+          outDir,
+          appOutDir: path.dirname(appPath),
+          platformName: this.platform.nodeName as ElectronPlatformName,
+          arch,
+          platformSpecificBuildOptions: this.platformSpecificBuildOptions,
+          targets,
+        })
       }
       this.packageInDistributableFormat(appPath, arch, targets, taskManager)
     }
   }
 
-  private async sign(appPath: string, outDir: string | null, masOptions: MasConfiguration | null, arch: Arch | null): Promise<boolean> {
+  private async sign(appPath: string, outDir: string | null, masOptions: MasConfiguration | null, arch: Arch): Promise<boolean> {
     if (!isSignAllowed()) {
       return false
     }
@@ -200,12 +270,16 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     const isMas = masOptions != null
     const options = masOptions == null ? this.platformSpecificBuildOptions : masOptions
     const qualifier = options.identity
+    const fallBackToAdhoc = (arch === Arch.arm64 || arch === Arch.universal) && !this.forceCodeSigning
 
     if (qualifier === null) {
       if (this.forceCodeSigning) {
         throw new InvalidConfigurationError("identity explicitly is set to null, but forceCodeSigning is set to true")
       }
       log.info({ reason: "identity explicitly is set to null" }, "skipped macOS code signing")
+      if (fallBackToAdhoc) {
+        log.warn("arm64 requires signing, but identity is set to null and signing is being skipped")
+      }
       return false
     }
 
@@ -231,7 +305,13 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
         }
       }
 
-      if (identity == null) {
+      const noIdentity = !options.sign && identity == null
+      if (qualifier === "-") {
+        identity = new Identity("-", undefined)
+      } else if (noIdentity && fallBackToAdhoc) {
+        log.warn(null, "falling back to ad-hoc signature for macOS application code signing")
+        identity = new Identity("-", undefined)
+      } else if (noIdentity) {
         await reportError(isMas, certificateTypes, qualifier, keychainFile, this.forceCodeSigning)
         return false
       }
@@ -255,17 +335,24 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     let binaries = options.binaries || undefined
     if (binaries) {
       // Accept absolute paths for external binaries, else resolve relative paths from the artifact's app Contents path.
-      binaries = await Promise.all(
-        binaries.map(async destination => {
-          if (await statOrNull(destination)) {
-            return destination
-          }
-          return path.resolve(appPath, destination)
-        })
-      )
-      log.info("Signing addtional user-defined binaries: " + JSON.stringify(binaries, null, 1))
+      binaries = (
+        await Promise.all(
+          binaries.flatMap(async destination => {
+            const expandedDestination = this.expandArch(destination, arch)
+            return await Promise.all(
+              expandedDestination.map(async d => {
+                if (await statOrNull(d)) {
+                  return d
+                }
+                return path.resolve(appPath, d)
+              })
+            )
+          })
+        )
+      ).flat()
+      log.info({ binaries, arch: arch == null ? null : Arch[arch] }, "signing additional user-defined binaries for arch")
     }
-    const customSignOptions = (isMas ? masOptions : this.platformSpecificBuildOptions) || this.platformSpecificBuildOptions
+    const customSignOptions: MasConfiguration | MacConfiguration = (isMas ? masOptions : this.platformSpecificBuildOptions) || this.platformSpecificBuildOptions
 
     const signOptions: SignOptions = {
       identityValidation: false,
@@ -306,16 +393,7 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
       provisioningProfile: customSignOptions.provisioningProfile || undefined,
     }
 
-    log.info(
-      {
-        file: log.filePath(appPath),
-        identityName: identity.name,
-        identityHash: identity.hash,
-        provisioningProfile: signOptions.provisioningProfile || "none",
-      },
-      "signing"
-    )
-    await this.doSign(signOptions)
+    await this.doSign(signOptions, customSignOptions, identity)
 
     // https://github.com/electron-userland/electron-builder/issues/1196#issuecomment-312310209
     if (masOptions != null && !isDevelopment) {
@@ -329,11 +407,17 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
       const artifactName = this.expandArtifactNamePattern(masOptions, "pkg", arch)
       const artifactPath = path.join(outDir!, artifactName)
       await this.doFlat(appPath, artifactPath, masInstallerIdentity, keychainFile)
-      await this.dispatchArtifactCreated(artifactPath, null, Arch.x64, this.computeSafeArtifactName(artifactName, "pkg", arch, true, this.platformSpecificBuildOptions.defaultArch))
+      await this.info.emitArtifactBuildCompleted({
+        file: artifactPath,
+        target: null,
+        arch: Arch.x64,
+        safeArtifactName: this.computeSafeArtifactName(artifactName, "pkg", arch, true, this.platformSpecificBuildOptions.defaultArch),
+        packager: this,
+      })
     }
 
     if (!isMas) {
-      await this.notarizeIfProvided(appPath, options)
+      await this.notarizeIfProvided(appPath)
     }
     return true
   }
@@ -385,6 +469,7 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
         hardenedRuntime: hardenedRuntime ?? undefined,
         timestamp: customSignOptions.timestamp || undefined,
         requirements: requirements || undefined,
+        additionalArguments: customSignOptions.additionalArguments || [],
       }
       log.debug({ file: log.filePath(filePath), ...args }, "selecting signing options")
       return args
@@ -393,12 +478,27 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
   }
 
   //noinspection JSMethodCanBeStatic
-  protected doSign(opts: SignOptions): Promise<any> {
-    return signAsync(opts)
+  protected async doSign(opts: SignOptions, customSignOptions: MacConfiguration, identity: Identity | null): Promise<void> {
+    const customSign = await resolveFunction(this.appInfo.type, customSignOptions.sign, "sign")
+
+    const { app, platform, type, provisioningProfile } = opts
+    log.info(
+      {
+        file: log.filePath(app),
+        platform,
+        type,
+        identityName: identity?.name || "none",
+        identityHash: identity?.hash || "none",
+        provisioningProfile: provisioningProfile || "none",
+      },
+      customSign ? "executing custom sign" : "signing"
+    )
+
+    return customSign ? Promise.resolve(customSign(opts, this)) : sign({ ...opts, identity: identity ? identity.name : undefined })
   }
 
   //noinspection JSMethodCanBeStatic
-  protected async doFlat(appPath: string, outFile: string, identity: Identity, keychain: string | null | undefined): Promise<any> {
+  protected async doFlat(appPath: string, outFile: string, identity: Identity, keychain: string | Nullish): Promise<any> {
     // productbuild doesn't created directory for out file
     await mkdir(path.dirname(outFile), { recursive: true })
 
@@ -424,19 +524,44 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     // https://github.com/electron-userland/electron-builder/issues/1278
     appPlist.CFBundleExecutable = appFilename.endsWith(" Helper") ? appFilename.substring(0, appFilename.length - " Helper".length) : appFilename
 
-    const icon = await this.getIconPath()
-    if (icon != null) {
+    const resourcesPath = path.join(contentsPath, "Resources")
+
+    // Support both legacy `.icns` and modern `.icon` (Icon Composer) inputs via `mac.icon`.
+    // Prefer `.icon` if provided; still accept `.icns`.
+    const configuredIcon = this.platformSpecificBuildOptions.icon
+    const isIconComposer = typeof configuredIcon === "string" && configuredIcon.toLowerCase().endsWith(".icon")
+
+    // Set the app name
+    appPlist.CFBundleName = appInfo.productName
+    appPlist.CFBundleDisplayName = appInfo.productName
+
+    // Bundle legacy `icns` format - this should also run when `.icon` is provided
+    const setIcnsFile = async (iconPath: string) => {
       const oldIcon = appPlist.CFBundleIconFile
-      const resourcesPath = path.join(contentsPath, "Resources")
       if (oldIcon != null) {
         await unlinkIfExists(path.join(resourcesPath, oldIcon))
       }
       const iconFileName = "icon.icns"
       appPlist.CFBundleIconFile = iconFileName
-      await copyFile(icon, path.join(resourcesPath, iconFileName))
+      await copyFile(iconPath, path.join(resourcesPath, iconFileName))
     }
-    appPlist.CFBundleName = appInfo.productName
-    appPlist.CFBundleDisplayName = appInfo.productName
+
+    const icnsFilePath = await this.getIconPath()
+    if (icnsFilePath != null) {
+      await setIcnsFile(icnsFilePath)
+    }
+
+    // Bundle new `icon` format
+    if (isIconComposer && configuredIcon) {
+      const iconComposerPath = await this.getResource(configuredIcon)
+      if (iconComposerPath) {
+        const { assetCatalog } = await this.generateAssetCatalogData(iconComposerPath)
+
+        // Create and setup the asset catalog
+        appPlist.CFBundleIconName = "Icon"
+        await fs.writeFile(path.join(resourcesPath, "Assets.car"), assetCatalog)
+      }
+    }
 
     const minimumSystemVersion = this.platformSpecificBuildOptions.minimumSystemVersion
     if (minimumSystemVersion != null) {
@@ -460,13 +585,14 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
   }
 
   protected async signApp(packContext: AfterPackContext, isAsar: boolean): Promise<boolean> {
-    const readDirectoryAndSign = async (sourceDirectory: string, directories: string[], filter: (file: string) => boolean): Promise<boolean> => {
-      await BluebirdPromise.map(directories, async (file: string): Promise<null> => {
-        if (filter(file)) {
-          await this.sign(path.join(sourceDirectory, file), null, null, null)
-        }
-        return null
-      })
+    const readDirectoryAndSign = async (sourceDirectory: string, directories: string[], shouldSign: (file: string) => boolean): Promise<boolean> => {
+      await Promise.all(
+        directories.map(async (file: string) => {
+          if (shouldSign(file)) {
+            await this.sign(path.join(sourceDirectory, file), null, null, packContext.arch)
+          }
+        })
+      )
       return true
     }
 
@@ -482,23 +608,26 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
     return true
   }
 
-  private async notarizeIfProvided(appPath: string, buildOptions: MacConfiguration) {
-    const notarizeOptions = buildOptions.notarize
-    if (!notarizeOptions) {
-      log.info({ reason: "`notarize` options were not provided" }, "skipped macOS notarization")
+  async notarizeIfProvided(appPath: string) {
+    const notarizeOptions = this.platformSpecificBuildOptions.notarize
+    if (notarizeOptions === false) {
+      log.info({ reason: "`notarize` options were set explicitly `false`" }, "skipped macOS notarization")
       return
     }
     const options = this.getNotarizeOptions(appPath)
     if (!options) {
+      log.warn({ reason: "`notarize` options were unable to be generated" }, "skipped macOS notarization")
       return
     }
     await notarize(options)
     log.info(null, "notarization successful")
   }
 
-  private getNotarizeOptions(appPath: string) {
+  private getNotarizeOptions(appPath: string): NotarizeOptionsNotaryTool | undefined {
+    const teamId = process.env.APPLE_TEAM_ID
     const appleId = process.env.APPLE_ID
     const appleIdPassword = process.env.APPLE_APP_SPECIFIC_PASSWORD
+    const tool = "notarytool"
 
     // option 1: app specific password
     if (appleId || appleIdPassword) {
@@ -508,7 +637,10 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
       if (!appleIdPassword) {
         throw new InvalidConfigurationError(`APPLE_APP_SPECIFIC_PASSWORD env var needs to be set`)
       }
-      return this.generateNotarizeOptions(appPath, { appleId, appleIdPassword })
+      if (!teamId) {
+        throw new InvalidConfigurationError(`APPLE_TEAM_ID env var needs to be set`)
+      }
+      return { tool, appPath, appleId, appleIdPassword, teamId }
     }
 
     // option 2: API key
@@ -519,55 +651,21 @@ export default class MacPackager extends PlatformPackager<MacConfiguration> {
       if (!appleApiKey || !appleApiKeyId || !appleApiIssuer) {
         throw new InvalidConfigurationError(`Env vars APPLE_API_KEY, APPLE_API_KEY_ID and APPLE_API_ISSUER need to be set`)
       }
-      return this.generateNotarizeOptions(appPath, undefined, { appleApiKey, appleApiKeyId, appleApiIssuer })
+      return { tool, appPath, appleApiKey, appleApiKeyId, appleApiIssuer }
     }
 
     // option 3: keychain
     const keychain = process.env.APPLE_KEYCHAIN
     const keychainProfile = process.env.APPLE_KEYCHAIN_PROFILE
-    if (keychain && keychainProfile) {
-      return this.generateNotarizeOptions(appPath, undefined, { keychain, keychainProfile })
+    if (keychainProfile) {
+      let args: NotaryToolKeychainCredentials = { keychainProfile }
+      if (keychain) {
+        args = { ...args, keychain }
+      }
+      return { tool, appPath, ...args }
     }
 
     // if no credentials provided, skip silently
-    return undefined
-  }
-
-  private generateNotarizeOptions(appPath: string, legacyLogin?: LegacyNotarizePasswordCredentials, notaryToolLogin?: NotaryToolCredentials): NotarizeOptions | undefined {
-    const options = this.platformSpecificBuildOptions.notarize
-    if (typeof options === "boolean" && legacyLogin) {
-      const proj: LegacyNotarizeStartOptions = {
-        appPath,
-        ...legacyLogin,
-        appBundleId: this.appInfo.id,
-      }
-      return proj
-    }
-    const { teamId } = options as NotarizeNotaryOptions
-    if ((teamId || options === true) && (legacyLogin || notaryToolLogin)) {
-      const proj: NotaryToolStartOptions = {
-        appPath,
-        ...(legacyLogin ?? notaryToolLogin!),
-        teamId,
-      }
-      return { tool: "notarytool", ...proj }
-    }
-    if (legacyLogin) {
-      const { appBundleId, ascProvider } = options as NotarizeLegacyOptions
-      return {
-        appPath,
-        ...legacyLogin,
-        appBundleId: appBundleId || this.appInfo.id,
-        ascProvider: ascProvider || undefined,
-      }
-    }
-    if (notaryToolLogin) {
-      return {
-        tool: "notarytool",
-        appPath,
-        ...notaryToolLogin,
-      }
-    }
     return undefined
   }
 }

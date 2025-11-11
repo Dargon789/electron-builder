@@ -3,7 +3,8 @@ import { createHash } from "crypto"
 import { createReadStream } from "fs"
 // @ts-ignore
 import * as isEqual from "lodash.isequal"
-import { Logger, ResolvedUpdateFileInfo } from "./main"
+import { ResolvedUpdateFileInfo } from "./types"
+import { Logger } from "./types"
 import { pathExists, readJson, emptyDir, outputJson, unlink } from "fs-extra"
 import * as path from "path"
 
@@ -90,7 +91,7 @@ export class DownloadedUpdateHelper {
     try {
       // remove stale data
       await emptyDir(this.cacheDirForPendingUpdate)
-    } catch (ignore) {
+    } catch (_ignore) {
       // ignore
     }
   }
@@ -121,7 +122,7 @@ export class DownloadedUpdateHelper {
       return null
     }
 
-    const isCachedInfoFileNameValid = cachedInfo?.fileName !== null ?? false
+    const isCachedInfoFileNameValid = cachedInfo?.fileName !== null
     if (!isCachedInfoFileNameValid) {
       logger.warn(`Cached update info is corrupted: no fileName, directory for cached update will be cleaned`)
       await this.cleanCacheDirForPendingUpdate()

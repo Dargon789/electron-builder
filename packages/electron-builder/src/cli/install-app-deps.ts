@@ -1,16 +1,15 @@
 #! /usr/bin/env node
 
 import { getElectronVersion } from "app-builder-lib/out/electron/electronVersion"
-import { computeDefaultAppDirectory, getConfig } from "app-builder-lib/out/util/config"
+import { computeDefaultAppDirectory, getConfig } from "app-builder-lib/out/util/config/config"
+import { orNullIfFileNotExist } from "app-builder-lib/out/util/config/load"
+import { createLazyProductionDeps } from "app-builder-lib/out/util/packageDependencies"
 import { installOrRebuild } from "app-builder-lib/out/util/yarn"
 import { PACKAGE_VERSION } from "app-builder-lib/out/version"
-import { createLazyProductionDeps } from "app-builder-lib/out/util/packageDependencies"
-import { getArchCliNames, log, use } from "builder-util"
-import { printErrorAndExit } from "builder-util/out/promise"
+import { getArchCliNames, log, printErrorAndExit, use } from "builder-util"
 import { readJson } from "fs-extra"
 import { Lazy } from "lazy-val"
 import * as path from "path"
-import { orNullIfFileNotExist } from "read-config-file"
 import * as yargs from "yargs"
 
 /** @internal */
@@ -58,12 +57,15 @@ export async function installAppDeps(args: any) {
   // if two package.json — force full install (user wants to install/update app deps in addition to dev)
   await installOrRebuild(
     config,
-    appDir,
+    {
+      appDir,
+      projectDir,
+    },
     {
       frameworkInfo: { version, useCustomDist: true },
       platform: args.platform,
       arch: args.arch,
-      productionDeps: createLazyProductionDeps(appDir, null),
+      productionDeps: createLazyProductionDeps(appDir, null, false),
     },
     appDir !== projectDir
   )

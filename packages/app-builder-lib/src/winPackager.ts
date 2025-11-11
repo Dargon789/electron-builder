@@ -1,23 +1,14 @@
-import BluebirdPromise from "bluebird-lst"
-import { Arch, asArray, InvalidConfigurationError, log, use, executeAppBuilder } from "builder-util"
-import { parseDn } from "builder-util-runtime"
-import { CopyFileTransformer, FileTransformer, walk } from "builder-util/out/fs"
+import { Arch, CopyFileTransformer, executeAppBuilder, FileTransformer, InvalidConfigurationError, use, walk } from "builder-util"
+import { Nullish } from "builder-util-runtime"
 import { createHash } from "crypto"
 import { readdir } from "fs/promises"
-import * as isCI from "is-ci"
+import { isCI } from "ci-info"
 import { Lazy } from "lazy-val"
 import * as path from "path"
-import { importCertificate } from "./codeSign/codesign"
-import {
-  CertificateFromStoreInfo,
-  CertificateInfo,
-  FileCodeSigningInfo,
-  getCertificateFromStoreInfo,
-  getCertInfo,
-  getSignVendorPath,
-  sign,
-  WindowsSignOptions,
-} from "./codeSign/windowsCodeSign"
+import { SignManager } from "./codeSign/signManager"
+import { signWindows, WindowsSignOptions } from "./codeSign/windowsCodeSign"
+import { WindowsSignAzureManager } from "./codeSign/windowsSignAzureManager"
+import { FileCodeSigningInfo, getSignVendorPath, WindowsSignToolManager } from "./codeSign/windowsSignToolManager"
 import { AfterPackContext } from "./configuration"
 import { DIR_TARGET, Platform, Target } from "./core"
 import { RequestedExecutionLevel, WindowsConfiguration } from "./options/winOptions"
@@ -37,90 +28,19 @@ import { getWindowsVm, VmManager } from "./vm/vm"
 import { execWine } from "./wine"
 
 export class WinPackager extends PlatformPackager<WindowsConfiguration> {
-  readonly cscInfo = new Lazy<FileCodeSigningInfo | CertificateFromStoreInfo | null>(() => {
-    const platformSpecificBuildOptions = this.platformSpecificBuildOptions
-    if (platformSpecificBuildOptions.certificateSubjectName != null || platformSpecificBuildOptions.certificateSha1 != null) {
-      return this.vm.value
-        .then(vm => getCertificateFromStoreInfo(platformSpecificBuildOptions, vm))
-        .catch((e: any) => {
-          // https://github.com/electron-userland/electron-builder/pull/2397
-          if (platformSpecificBuildOptions.sign == null) {
-            throw e
-          } else {
-            log.debug({ error: e }, "getCertificateFromStoreInfo error")
-            return null
-          }
-        })
-    }
-
-    const certificateFile = platformSpecificBuildOptions.certificateFile
-    if (certificateFile != null) {
-      const certificatePassword = this.getCscPassword()
-      return Promise.resolve({
-        file: certificateFile,
-        password: certificatePassword == null ? null : certificatePassword.trim(),
-      })
-    }
-
-    const cscLink = this.getCscLink("WIN_CSC_LINK")
-    if (cscLink == null) {
-      return Promise.resolve(null)
-    }
-
-    return (
-      importCertificate(cscLink, this.info.tempDirManager, this.projectDir)
-        // before then
-        .catch((e: any) => {
-          if (e instanceof InvalidConfigurationError) {
-            throw new InvalidConfigurationError(`Env WIN_CSC_LINK is not correct, cannot resolve: ${e.message}`)
-          } else {
-            throw e
-          }
-        })
-        .then(path => {
-          return {
-            file: path,
-            password: this.getCscPassword(),
-          }
-        })
-    )
-  })
-
-  private _iconPath = new Lazy(() => this.getOrConvertIcon("ico"))
+  _iconPath = new Lazy(() => this.getOrConvertIcon("ico"))
 
   readonly vm = new Lazy<VmManager>(() => (process.platform === "win32" ? Promise.resolve(new VmManager()) : getWindowsVm(this.debugLogger)))
 
-  readonly computedPublisherName = new Lazy<Array<string> | null>(async () => {
-    const publisherName = this.platformSpecificBuildOptions.publisherName
-    if (publisherName === null) {
-      return null
-    } else if (publisherName != null) {
-      return asArray(publisherName)
+  readonly signingManager = new Lazy(async () => {
+    let manager: SignManager
+    if (this.platformSpecificBuildOptions.azureSignOptions != null) {
+      manager = new WindowsSignAzureManager(this)
+    } else {
+      manager = new WindowsSignToolManager(this)
     }
-
-    const certInfo = await this.lazyCertInfo.value
-    return certInfo == null ? null : [certInfo.commonName]
-  })
-
-  readonly lazyCertInfo = new Lazy<CertificateInfo | null>(async () => {
-    const cscInfo = await this.cscInfo.value
-    if (cscInfo == null) {
-      return null
-    }
-
-    if ("subject" in cscInfo) {
-      const bloodyMicrosoftSubjectDn = cscInfo.subject
-      return {
-        commonName: parseDn(bloodyMicrosoftSubjectDn).get("CN")!,
-        bloodyMicrosoftSubjectDn,
-      }
-    }
-
-    const cscFile = cscInfo.file
-    if (cscFile == null) {
-      return null
-    }
-    return await getCertInfo(cscFile, cscInfo.password || "")
+    await manager.initialize()
+    return manager
   })
 
   get isForceCodeSigningVerification(): boolean {
@@ -133,10 +53,6 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
 
   get defaultTarget(): Array<string> {
     return ["nsis"]
-  }
-
-  protected doGetCscPassword(): string | undefined | null {
-    return chooseNotNull(chooseNotNull(this.platformSpecificBuildOptions.certificatePassword, process.env.WIN_CSC_KEY_PASSWORD), super.doGetCscPassword())
   }
 
   createTargets(targets: Array<string>, mapper: (name: string, factory: (outDir: string) => Target) => void): void {
@@ -199,77 +115,23 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
     return this._iconPath.value
   }
 
-  async sign(file: string, logMessagePrefix?: string): Promise<boolean> {
+  doGetCscPassword(): string | Nullish {
+    return chooseNotNull(chooseNotNull(this.platformSpecificBuildOptions.signtoolOptions?.certificatePassword, process.env.WIN_CSC_KEY_PASSWORD), super.doGetCscPassword())
+  }
+
+  async sign(file: string): Promise<boolean> {
     const signOptions: WindowsSignOptions = {
       path: file,
-      name: this.appInfo.productName,
-      site: await this.appInfo.computePackageUrl(),
       options: this.platformSpecificBuildOptions,
     }
 
-    const cscInfo = await this.cscInfo.value
-    if (cscInfo == null) {
-      if (this.platformSpecificBuildOptions.sign != null) {
-        return sign(signOptions, this)
-      } else if (this.forceCodeSigning) {
-        throw new InvalidConfigurationError(
-          `App is not signed and "forceCodeSigning" is set to true, please ensure that code signing configuration is correct, please see https://electron.build/code-signing`
-        )
-      }
-      return false
-    }
-
-    if (logMessagePrefix == null) {
-      logMessagePrefix = "signing"
-    }
-
-    if ("file" in cscInfo) {
-      log.info(
-        {
-          file: log.filePath(file),
-          certificateFile: cscInfo.file,
-        },
-        logMessagePrefix
-      )
-    } else {
-      const info = cscInfo
-      log.info(
-        {
-          file: log.filePath(file),
-          subject: info.subject,
-          thumbprint: info.thumbprint,
-          store: info.store,
-          user: info.isLocalMachineStore ? "local machine" : "current user",
-        },
-        logMessagePrefix
+    const didSignSuccessfully = await signWindows(signOptions, this)
+    if (!didSignSuccessfully && this.forceCodeSigning) {
+      throw new InvalidConfigurationError(
+        `App is not signed and "forceCodeSigning" is set to true, please ensure that code signing configuration is correct, please see https://electron.build/code-signing`
       )
     }
-
-    return this.doSign({
-      ...signOptions,
-      cscInfo,
-      options: {
-        ...this.platformSpecificBuildOptions,
-      },
-    })
-  }
-
-  private async doSign(options: WindowsSignOptions) {
-    for (let i = 0; i < 3; i++) {
-      try {
-        await sign(options, this)
-        return true
-      } catch (e: any) {
-        // https://github.com/electron-userland/electron-builder/issues/1414
-        const message = e.message
-        if (message != null && message.includes("Couldn't resolve host name")) {
-          log.warn({ error: message, attempt: i + 1 }, `cannot sign`)
-          continue
-        }
-        throw e
-      }
-    }
-    return false
+    return didSignSuccessfully
   }
 
   async signAndEditResources(file: string, arch: Arch, outDir: string, internalName?: string | null, requestedExecutionLevel?: RequestedExecutionLevel | null) {
@@ -311,7 +173,7 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
     })
 
     const config = this.config
-    const cscInfoForCacheDigest = !isBuildCacheEnabled() || isCI || config.electronDist != null ? null : await this.cscInfo.value
+    const cscInfoForCacheDigest = !isBuildCacheEnabled() || isCI || config.electronDist != null ? null : await (await this.signingManager.value).cscInfo.value
     let buildCacheManager: BuildCacheManager | null = null
     // resources editing doesn't change executable for the same input and executed quickly - no need to complicate
     if (cscInfoForCacheDigest != null) {
@@ -325,8 +187,8 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
       hash.update(config.electronVersion || "no electronVersion")
       hash.update(JSON.stringify(this.platformSpecificBuildOptions))
       hash.update(JSON.stringify(args))
-      hash.update(this.platformSpecificBuildOptions.certificateSha1 || "no certificateSha1")
-      hash.update(this.platformSpecificBuildOptions.certificateSubjectName || "no subjectName")
+      hash.update(this.platformSpecificBuildOptions.signtoolOptions?.certificateSha1 || "no certificateSha1")
+      hash.update(this.platformSpecificBuildOptions.signtoolOptions?.certificateSubjectName || "no subjectName")
 
       buildCacheManager = new BuildCacheManager(outDir, file, arch)
       if (await buildCacheManager.copyIfValid(await digest(hash, files))) {
@@ -354,9 +216,8 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
   }
 
   private shouldSignFile(file: string): boolean {
-    const shouldSignDll = this.platformSpecificBuildOptions.signDlls === true && file.endsWith(".dll")
     const shouldSignExplicit = !!this.platformSpecificBuildOptions.signExts?.some(ext => file.endsWith(ext))
-    return shouldSignDll || shouldSignExplicit || file.endsWith(".exe")
+    return shouldSignExplicit || file.endsWith(".exe")
   }
 
   protected createTransformerForExtraFiles(packContext: AfterPackContext): FileTransformer | null {
@@ -381,9 +242,10 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
       return false
     }
 
-    await BluebirdPromise.map(readdir(packContext.appOutDir), (file: string): any => {
+    const files = await readdir(packContext.appOutDir)
+    for (const file of files) {
       if (file === exeFileName) {
-        return this.signAndEditResources(
+        await this.signAndEditResources(
           path.join(packContext.appOutDir, exeFileName),
           packContext.arch,
           packContext.outDir,
@@ -391,10 +253,9 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
           this.platformSpecificBuildOptions.requestedExecutionLevel
         )
       } else if (this.shouldSignFile(file)) {
-        return this.sign(path.join(packContext.appOutDir, file))
+        await this.sign(path.join(packContext.appOutDir, file))
       }
-      return null
-    })
+    }
 
     if (!isAsar) {
       return true
@@ -405,7 +266,9 @@ export class WinPackager extends PlatformPackager<WindowsConfiguration> {
       return walk(outDir, (file, stat) => stat.isDirectory() || this.shouldSignFile(file))
     }
     const filesToSign = await Promise.all([filesPromise(["resources", "app.asar.unpacked"]), filesPromise(["swiftshader"])])
-    await BluebirdPromise.map(filesToSign.flat(1), file => this.sign(file), { concurrency: 4 })
+    for (const file of filesToSign.flat(1)) {
+      await this.sign(file)
+    }
 
     return true
   }

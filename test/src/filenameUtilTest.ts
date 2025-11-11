@@ -1,4 +1,4 @@
-import { getCompleteExtname } from "app-builder-lib/out/util/filename"
+import { getCompleteExtname } from "builder-util/out/filename"
 
 // [inputFilename, expectedExtname]
 const tests = [
@@ -32,7 +32,7 @@ const tests = [
 
 describe("getCompleteExtname", () => {
   for (const [filename, expected] of tests) {
-    test(`get complete extname for ${filename}`, () => {
+    test(`get complete extname for ${filename}`, ({ expect }) => {
       const extname = getCompleteExtname(filename)
 
       expect(extname).toBe(expected)

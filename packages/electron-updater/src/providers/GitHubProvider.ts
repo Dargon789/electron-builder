@@ -2,7 +2,7 @@ import { CancellationToken, GithubOptions, githubUrl, HttpError, newError, parse
 import * as semver from "semver"
 import { URL } from "url"
 import { AppUpdater } from "../AppUpdater"
-import { ResolvedUpdateFileInfo } from "../main"
+import { ResolvedUpdateFileInfo } from "../types"
 import { getChannelFilename, newBaseUrl, newUrlFromBase } from "../util"
 import { parseUpdateInfo, Provider, ProviderRuntimeOptions, resolveFiles } from "./Provider"
 
@@ -16,7 +16,11 @@ export abstract class BaseGitHubProvider<T extends UpdateInfo> extends Provider<
   protected readonly baseUrl: URL
   protected readonly baseApiUrl: URL
 
-  protected constructor(protected readonly options: GithubOptions, defaultHost: string, runtimeOptions: ProviderRuntimeOptions) {
+  protected constructor(
+    protected readonly options: GithubOptions,
+    defaultHost: string,
+    runtimeOptions: ProviderRuntimeOptions
+  ) {
     super({
       ...runtimeOptions,
       /* because GitHib uses S3 */
@@ -36,8 +40,17 @@ export abstract class BaseGitHubProvider<T extends UpdateInfo> extends Provider<
 }
 
 export class GitHubProvider extends BaseGitHubProvider<GithubUpdateInfo> {
-  constructor(protected readonly options: GithubOptions, private readonly updater: AppUpdater, runtimeOptions: ProviderRuntimeOptions) {
+  constructor(
+    protected readonly options: GithubOptions,
+    private readonly updater: AppUpdater,
+    runtimeOptions: ProviderRuntimeOptions
+  ) {
     super(options, "github.com", runtimeOptions)
+  }
+
+  private get channel(): string {
+    const result = this.updater.channel || this.options.channel
+    return result == null ? this.getDefaultChannelName() : this.getCustomChannelName(result)
   }
 
   async getLatestVersion(): Promise<GithubUpdateInfo> {
@@ -128,7 +141,10 @@ export class GitHubProvider extends BaseGitHubProvider<GithubUpdateInfo> {
     }
 
     try {
-      const channel = this.updater.allowPrerelease ? this.getCustomChannelName(String(semver.prerelease(tag)?.[0] || "latest")) : this.getDefaultChannelName()
+      let channel = this.channel
+      if (this.updater.allowPrerelease && semver.prerelease(tag)?.[0]) {
+        channel = this.getCustomChannelName(String(semver.prerelease(tag)?.[0]))
+      }
       rawData = await fetchData(channel)
     } catch (e: any) {
       if (this.updater.allowPrerelease) {

@@ -1,6 +1,6 @@
-import { Arch, executeAppBuilder, getArchSuffix, log, TmpDir, toLinuxArchString, use, serializeToYaml, asArray } from "builder-util"
-import { unlinkIfExists } from "builder-util/out/fs"
-import { outputFile, stat } from "fs-extra"
+import { Arch, asArray, exec, getArchSuffix, log, serializeToYaml, TmpDir, toLinuxArchString, unlinkIfExists, use } from "builder-util"
+import { Nullish } from "builder-util-runtime"
+import { copyFile, outputFile, stat } from "fs-extra"
 import { mkdir, readFile } from "fs/promises"
 import * as path from "path"
 import { smarten } from "../appInfo"
@@ -8,16 +8,15 @@ import { Target } from "../core"
 import * as errorMessages from "../errorMessages"
 import { LinuxPackager } from "../linuxPackager"
 import { DebOptions, LinuxTargetSpecificOptions } from "../options/linuxOptions"
+import { ArtifactCreated } from "../packagerApi"
+import { getAppUpdatePublishConfiguration } from "../publish/PublishManager"
 import { objectToArgs } from "../util/appBuilder"
 import { computeEnv } from "../util/bundledTool"
+import { hashFile } from "../util/hash"
 import { isMacOsSierra } from "../util/macosVersion"
 import { getTemplatePath } from "../util/pathManager"
 import { installPrefix, LinuxTargetHelper } from "./LinuxTargetHelper"
-import { getLinuxToolsPath } from "./tools"
-import { hashFile } from "../util/hash"
-import { ArtifactCreated } from "../packagerApi"
-import { getAppUpdatePublishConfiguration } from "../publish/PublishManager"
-import { getPath7za } from "builder-util"
+import { getFpmPath, getLinuxToolsPath } from "./tools"
 
 interface FpmOptions {
   name: string
@@ -26,18 +25,29 @@ interface FpmOptions {
   url: string
 }
 
+interface ScriptFiles {
+  afterRemove: string
+  afterInstall: string
+  appArmor: string
+}
+
 export default class FpmTarget extends Target {
   readonly options: LinuxTargetSpecificOptions = { ...this.packager.platformSpecificBuildOptions, ...(this.packager.config as any)[this.name] }
 
-  private readonly scriptFiles: Promise<Array<string>>
+  private readonly scriptFiles: Promise<ScriptFiles>
 
-  constructor(name: string, private readonly packager: LinuxPackager, private readonly helper: LinuxTargetHelper, readonly outDir: string) {
+  constructor(
+    name: string,
+    private readonly packager: LinuxPackager,
+    private readonly helper: LinuxTargetHelper,
+    readonly outDir: string
+  ) {
     super(name, false)
 
     this.scriptFiles = this.createScripts()
   }
 
-  private async createScripts(): Promise<Array<string>> {
+  private async createScripts(): Promise<ScriptFiles> {
     const defaultTemplatesDir = getTemplatePath("linux")
 
     const packager = this.packager
@@ -49,17 +59,18 @@ export default class FpmTarget extends Target {
       ...packager.platformSpecificBuildOptions,
     }
 
-    function getResource(value: string | null | undefined, defaultFile: string) {
+    function getResource(value: string | Nullish, defaultFile: string) {
       if (value == null) {
         return path.join(defaultTemplatesDir, defaultFile)
       }
       return path.resolve(packager.projectDir, value)
     }
 
-    return await Promise.all<string>([
-      writeConfigFile(packager.info.tempDirManager, getResource(this.options.afterInstall, "after-install.tpl"), templateOptions),
-      writeConfigFile(packager.info.tempDirManager, getResource(this.options.afterRemove, "after-remove.tpl"), templateOptions),
-    ])
+    return {
+      afterInstall: await writeConfigFile(packager.info.tempDirManager, getResource(this.options.afterInstall, "after-install.tpl"), templateOptions),
+      afterRemove: await writeConfigFile(packager.info.tempDirManager, getResource(this.options.afterRemove, "after-remove.tpl"), templateOptions),
+      appArmor: await writeConfigFile(packager.info.tempDirManager, getResource(this.options.appArmorProfile, "apparmor-profile.tpl"), templateOptions),
+    }
   }
 
   checkOptions(): Promise<any> {
@@ -71,7 +82,7 @@ export default class FpmTarget extends Target {
     const projectUrl = await packager.appInfo.computePackageUrl()
     const errors: Array<string> = []
     if (projectUrl == null) {
-      errors.push("Please specify project homepage, see https://electron.build/configuration/configuration#Metadata-homepage")
+      errors.push("Please specify project homepage, see https://www.electron.build/configuration#metadata")
     }
 
     const options = this.options
@@ -115,7 +126,7 @@ export default class FpmTarget extends Target {
     const artifactName = packager.expandArtifactNamePattern(this.options, target, arch, nameFormat, !isUseArchIfX64)
     const artifactPath = path.join(this.outDir, artifactName)
 
-    await packager.info.callArtifactBuildStarted({
+    await packager.info.emitArtifactBuildStarted({
       targetPresentableName: target,
       file: artifactPath,
       arch,
@@ -125,20 +136,25 @@ export default class FpmTarget extends Target {
     if (packager.packagerOptions.prepackaged != null) {
       await mkdir(this.outDir, { recursive: true })
     }
+    const linuxDistType = packager.packagerOptions.prepackaged || path.join(this.outDir, `linux${getArchSuffix(arch)}-unpacked`)
+    const resourceDir = packager.getResourcesDir(linuxDistType)
 
     const publishConfig = this.supportsAutoUpdate(target)
       ? await getAppUpdatePublishConfiguration(packager, arch, false /* in any case validation will be done on publish */)
       : null
     if (publishConfig != null) {
-      const linuxDistType = this.packager.packagerOptions.prepackaged || path.join(this.outDir, `linux${getArchSuffix(arch)}-unpacked`)
-      const resourceDir = packager.getResourcesDir(linuxDistType)
-      log.info({ resourceDir }, `adding autoupdate files for: ${target}. (Beta feature)`)
+      log.info({ resourceDir: log.filePath(resourceDir) }, `adding autoupdate files for: ${target}. (Beta feature)`)
       await outputFile(path.join(resourceDir, "app-update.yml"), serializeToYaml(publishConfig))
       // Extra file needed for auto-updater to detect installation method
       await outputFile(path.join(resourceDir, "package-type"), target)
     }
 
     const scripts = await this.scriptFiles
+
+    // Install AppArmor support for ubuntu 24+
+    // https://github.com/electron-userland/electron-builder/issues/8635
+    await copyFile(scripts.appArmor, path.join(resourceDir, "apparmor-profile"))
+
     const appInfo = packager.appInfo
     const options = this.options
     const synopsis = options.synopsis
@@ -146,11 +162,11 @@ export default class FpmTarget extends Target {
       "--architecture",
       toLinuxArchString(arch, target),
       "--after-install",
-      scripts[0],
+      scripts.afterInstall,
       "--after-remove",
-      scripts[1],
+      scripts.afterRemove,
       "--description",
-      smarten(target === "rpm" ? this.helper.getDescription(options)! : `${synopsis || ""}\n ${this.helper.getDescription(options)}`),
+      smarten(target === "rpm" ? this.helper.getDescription(options) : `${synopsis || ""}\n ${this.helper.getDescription(options)}`),
       "--version",
       this.helper.getSanitizedVersion(target),
       "--package",
@@ -186,20 +202,21 @@ export default class FpmTarget extends Target {
     if (depends != null) {
       if (Array.isArray(depends)) {
         fpmConfiguration.customDepends = depends
+      } else if (typeof depends === "string") {
+        fpmConfiguration.customDepends = [depends as string]
       } else {
-        // noinspection SuspiciousTypeOfGuard
-        if (typeof depends === "string") {
-          fpmConfiguration.customDepends = [depends as string]
-        } else {
-          throw new Error(`depends must be Array or String, but specified as: ${depends}`)
-        }
+        throw new Error(`depends must be Array or String, but specified as: ${depends}`)
       }
+    } else {
+      fpmConfiguration.customDepends = this.getDefaultDepends(target)
     }
 
     if (target === "deb") {
       const recommends = (options as DebOptions).recommends
       if (recommends) {
         fpmConfiguration.customRecommends = asArray(recommends)
+      } else {
+        fpmConfiguration.customRecommends = this.getDefaultRecommends(target)
       }
     }
 
@@ -236,8 +253,6 @@ export default class FpmTarget extends Target {
 
     const env = {
       ...process.env,
-      SZA_PATH: await getPath7za(),
-      SZA_COMPRESSION_LEVEL: packager.compression === "store" ? "0" : "9",
     }
 
     // rpmbuild wants directory rpm with some default config files. Even if we can use dylibbundler, path to such config files are not changed (we need to replace in the binary)
@@ -250,7 +265,7 @@ export default class FpmTarget extends Target {
       })
     }
 
-    await executeAppBuilder(["fpm", "--configuration", JSON.stringify(fpmConfiguration)], undefined, { env })
+    await this.executeFpm(target, fpmConfiguration, env)
 
     let info: ArtifactCreated = {
       file: artifactPath,
@@ -269,11 +284,107 @@ export default class FpmTarget extends Target {
         },
       }
     }
-    await packager.info.callArtifactBuildCompleted(info)
+    await packager.info.emitArtifactBuildCompleted(info)
+  }
+
+  private async executeFpm(target: string, fpmConfiguration: FpmConfiguration, env: any) {
+    const fpmArgs = ["-s", "dir", "--force", "-t", target]
+    const forceDebugLogging = process.env.FPM_DEBUG === "true"
+    if (forceDebugLogging) {
+      fpmArgs.push("--debug")
+    }
+    if (log.isDebugEnabled) {
+      fpmArgs.push("--log", "debug")
+    }
+    fpmConfiguration.customDepends?.forEach(it => fpmArgs.push("-d", it))
+    if (target === "deb") {
+      fpmConfiguration.customRecommends?.forEach(it => fpmArgs.push("--deb-recommends", it))
+    }
+
+    fpmArgs.push(...this.configureTargetSpecificOptions(target, fpmConfiguration.compression ?? "xz"))
+    fpmArgs.push(...fpmConfiguration.args)
+
+    const fpmPath = await getFpmPath()
+
+    await exec(fpmPath, fpmArgs, { env }).catch(e => {
+      if (e.message.includes("Need executable 'rpmbuild' to convert dir to rpm")) {
+        const hint = "to build rpm, executable rpmbuild is required, please install rpm package on your system. "
+        if (process.platform === "darwin") {
+          log.error(null, hint + "(brew install rpm)")
+        } else {
+          log.error(null, hint + "(sudo apt-get install rpm)")
+        }
+      }
+      if (e.message.includes("xz: not found")) {
+        const hint = "to build rpm, executable xz is required, please install xz package on your system. "
+        if (process.platform === "darwin") {
+          log.error(null, hint + "(brew install xz)")
+        } else {
+          log.error(null, hint + "(sudo apt-get install xz-utils)")
+        }
+      }
+      if (e.message.includes("error: File not found")) {
+        log.error(
+          { fpmArgs, ...fpmConfiguration },
+          "fpm failed to find the specified files. Please check your configuration and ensure all paths are correct. To see what files triggered this, set the environment variable FPM_DEBUG=true"
+        )
+        if (forceDebugLogging) {
+          log.error(null, e.message)
+        }
+        throw new Error(`FPM failed to find the specified files. Please check your configuration and ensure all paths are correct. Command: ${fpmPath} ${fpmArgs.join(" ")}`)
+      }
+      throw e
+    })
   }
 
   private supportsAutoUpdate(target: string) {
-    return ["deb", "rpm"].includes(target)
+    return ["deb", "rpm", "pacman"].includes(target)
+  }
+
+  private getDefaultDepends(target: string): string[] {
+    switch (target) {
+      case "deb":
+        return ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libsecret-1-0"]
+
+      case "rpm":
+        return [
+          "gtk3" /* for electron 2+ (electron 1 uses gtk2, but this old version is not supported anymore) */,
+          "libnotify",
+          "nss",
+          "libXScrnSaver",
+          "(libXtst or libXtst6)",
+          "xdg-utils",
+          "at-spi2-core" /* since 5.0.0 */,
+          "(libuuid or libuuid1)" /* since 4.0.0 */,
+        ]
+
+      case "pacman":
+        return ["c-ares", "ffmpeg", "gtk3", "http-parser", "libevent", "libvpx", "libxslt", "libxss", "minizip", "nss", "re2", "snappy", "libnotify", "libappindicator-gtk3"]
+
+      default:
+        return []
+    }
+  }
+
+  private getDefaultRecommends(target: string): string[] {
+    switch (target) {
+      case "deb":
+        return ["libappindicator3-1"]
+      default:
+        return []
+    }
+  }
+
+  private configureTargetSpecificOptions(target: string, compression: string): string[] {
+    switch (target) {
+      case "rpm":
+        return ["--rpm-os", "linux", "--rpm-compression", compression == "xz" ? "xzmt" : compression]
+      case "deb":
+        return ["--deb-compression", compression]
+      case "pacman":
+        return ["--pacman-compression", compression]
+    }
+    return []
   }
 }
 

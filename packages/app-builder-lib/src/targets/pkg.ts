@@ -1,16 +1,22 @@
-import { Arch, debug, exec, use } from "builder-util"
-import { statOrNull } from "builder-util/out/fs"
-import { PkgOptions } from "../options/pkgOptions"
-import { executeAppBuilderAndWriteJson, executeAppBuilderAsJson } from "../util/appBuilder"
-import { getNotLocalizedLicenseFile } from "../util/license"
+import { Arch, debug, exec, statOrNull, use } from "builder-util"
+import { Nullish } from "builder-util-runtime"
+import { readdirSync } from "fs"
 import { readFile, unlink, writeFile } from "fs/promises"
 import * as path from "path"
 import { filterCFBundleIdentifier } from "../appInfo"
 import { findIdentity, Identity } from "../codeSign/macCodeSign"
 import { Target } from "../core"
-import MacPackager from "../macPackager"
+import { MacPackager } from "../macPackager"
+import { PkgOptions } from "../options/pkgOptions"
+import { savePlistFile, parsePlistFile, PlistObject } from "../util/plist"
+import { getNotLocalizedLicenseFile } from "../util/license"
 
 const certType = "Developer ID Installer"
+
+type ExtraPackages = {
+  packagePath: string
+  packages: string[]
+}
 
 // http://www.shanekirk.com/2013/10/creating-flat-packages-in-osx/
 // to use --scripts, we must build .app bundle separately using pkgbuild
@@ -24,7 +30,10 @@ export class PkgTarget extends Target {
     ...this.packager.config.pkg,
   }
 
-  constructor(private readonly packager: MacPackager, readonly outDir: string) {
+  constructor(
+    private readonly packager: MacPackager,
+    readonly outDir: string
+  ) {
     super("pkg")
   }
 
@@ -37,7 +46,7 @@ export class PkgTarget extends Target {
     const artifactName = packager.expandArtifactNamePattern(options, "pkg", arch)
     const artifactPath = path.join(this.outDir, artifactName)
 
-    await packager.info.callArtifactBuildStarted({
+    await packager.info.emitArtifactBuildStarted({
       targetPresentableName: "pkg",
       file: artifactPath,
       arch,
@@ -49,12 +58,14 @@ export class PkgTarget extends Target {
     // https://developer.apple.com/library/content/documentation/DeveloperTools/Reference/DistributionDefinitionRef/Chapters/Distribution_XML_Ref.html
     const distInfoFile = path.join(appOutDir, "distribution.xml")
 
+    const extraPackages = this.getExtraPackages()
+
     const innerPackageFile = path.join(appOutDir, `${filterCFBundleIdentifier(appInfo.id)}.pkg`)
     const componentPropertyListFile = path.join(appOutDir, `${filterCFBundleIdentifier(appInfo.id)}.plist`)
     const identity = (
       await Promise.all([
         findIdentity(certType, options.identity || packager.platformSpecificBuildOptions.identity, keychainFile),
-        this.customizeDistributionConfiguration(distInfoFile, appPath),
+        this.customizeDistributionConfiguration(distInfoFile, appPath, extraPackages),
         this.buildComponentPackage(appPath, componentPropertyListFile, innerPackageFile),
       ])
     )[0]
@@ -65,22 +76,61 @@ export class PkgTarget extends Target {
 
     const args = prepareProductBuildArgs(identity, keychainFile)
     args.push("--distribution", distInfoFile)
+    if (extraPackages) {
+      args.push("--package-path", extraPackages.packagePath)
+    }
     args.push(artifactPath)
     use(options.productbuild, it => args.push(...(it as any)))
     await exec("productbuild", args, {
       cwd: appOutDir,
     })
     await Promise.all([unlink(innerPackageFile), unlink(distInfoFile)])
-
-    await packager.dispatchArtifactCreated(artifactPath, this, arch, packager.computeSafeArtifactName(artifactName, "pkg", arch))
+    await packager.notarizeIfProvided(artifactPath)
+    await packager.info.emitArtifactBuildCompleted({
+      file: artifactPath,
+      target: this,
+      arch,
+      safeArtifactName: packager.computeSafeArtifactName(artifactName, "pkg", arch),
+      packager,
+    })
   }
 
-  private async customizeDistributionConfiguration(distInfoFile: string, appPath: string) {
-    await exec("productbuild", ["--synthesize", "--component", appPath, distInfoFile], {
+  private getExtraPackages(): ExtraPackages | null {
+    const extraPkgsDir = this.options.extraPkgsDir
+    if (extraPkgsDir == null) {
+      return null
+    }
+    const packagePath = path.join(this.packager.info.buildResourcesDir, extraPkgsDir)
+    let files: Array<string>
+    try {
+      files = readdirSync(packagePath)
+    } catch (e: any) {
+      if (e.code === "ENOENT") {
+        return null
+      } else {
+        throw e
+      }
+    }
+    const packages = files.filter(file => file.endsWith(".pkg"))
+    if (packages.length === 0) {
+      return null
+    }
+    return { packagePath, packages }
+  }
+
+  private async customizeDistributionConfiguration(distInfoFile: string, appPath: string, extraPackages: ExtraPackages | null) {
+    const options = this.options
+    const args = ["--synthesize", "--component", appPath]
+    if (extraPackages) {
+      extraPackages.packages.forEach(pkg => {
+        args.push("--package", path.join(extraPackages.packagePath, pkg))
+      })
+    }
+    args.push(distInfoFile)
+    await exec("productbuild", args, {
       cwd: this.outDir,
     })
 
-    const options = this.options
     let distInfo = await readFile(distInfoFile, "utf-8")
 
     if (options.mustClose != null && options.mustClose.length !== 0) {
@@ -138,11 +188,10 @@ export class PkgTarget extends Target {
     await exec("pkgbuild", ["--analyze", "--root", rootPath, propertyListOutputFile])
 
     // process the template plist
-    const plistInfo = (await executeAppBuilderAsJson<Array<any>>(["decode-plist", "-f", propertyListOutputFile]))[0].filter(
-      (it: any) => it.RootRelativeBundlePath !== "Electron.dSYM"
-    )
+    const plistInfo = (await parsePlistFile<PlistObject[]>(propertyListOutputFile)).filter((it: PlistObject) => it.RootRelativeBundlePath !== "Electron.dSYM")
+    let packageInfo: any = {}
     if (plistInfo.length > 0) {
-      const packageInfo = plistInfo[0]
+      packageInfo = plistInfo[0]
 
       // ChildBundles lists all of electron binaries within the .app.
       // There is no particular reason for removing that key, except to be as close as possible to
@@ -164,22 +213,35 @@ export class PkgTarget extends Target {
       if (options.overwriteAction != null) {
         packageInfo.BundleOverwriteAction = options.overwriteAction
       }
-
-      await executeAppBuilderAndWriteJson(["encode-plist"], { [propertyListOutputFile]: plistInfo })
     }
 
     // now build the package
     const args = ["--root", rootPath, "--identifier", this.packager.appInfo.id, "--component-plist", propertyListOutputFile]
 
     use(this.options.installLocation || "/Applications", it => args.push("--install-location", it))
-    if (options.scripts != null) {
-      args.push("--scripts", path.resolve(this.packager.info.buildResourcesDir, options.scripts))
-    } else if (options.scripts !== null) {
-      const dir = path.join(this.packager.info.buildResourcesDir, "pkg-scripts")
-      const stat = await statOrNull(dir)
-      if (stat != null && stat.isDirectory()) {
-        args.push("--scripts", dir)
-      }
+
+    // nasty nested ternary-statement, probably should optimize
+    const scriptsDir =
+      // user-provided scripts dir
+      options.scripts != null
+        ? path.resolve(this.packager.info.buildResourcesDir, options.scripts)
+        : // fallback to default unless user explicitly sets null
+          options.scripts !== null
+          ? path.join(this.packager.info.buildResourcesDir, "pkg-scripts")
+          : null
+    if (scriptsDir && (await statOrNull(scriptsDir))?.isDirectory()) {
+      const dirContents = readdirSync(scriptsDir)
+      dirContents.forEach(name => {
+        if (name.includes("preinstall")) {
+          packageInfo.BundlePreInstallScriptPath = name
+        } else if (name.includes("postinstall")) {
+          packageInfo.BundlePostInstallScriptPath = name
+        }
+      })
+      args.push("--scripts", scriptsDir)
+    }
+    if (plistInfo.length > 0) {
+      await savePlistFile(propertyListOutputFile, plistInfo)
     }
 
     args.push(packageOutputFile)
@@ -188,7 +250,7 @@ export class PkgTarget extends Target {
   }
 }
 
-export function prepareProductBuildArgs(identity: Identity | null, keychain: string | null | undefined): Array<string> {
+export function prepareProductBuildArgs(identity: Identity | null, keychain: string | Nullish): Array<string> {
   const args: Array<string> = []
   if (identity != null) {
     args.push("--sign", identity.hash!)

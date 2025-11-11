@@ -1,17 +1,17 @@
-import BluebirdPromise from "bluebird-lst"
-import { asArray, executeAppBuilder, log } from "builder-util"
-import { CONCURRENCY, copyDir, DO_NOT_USE_HARD_LINKS, statOrNull, unlinkIfExists } from "builder-util/out/fs"
-import { emptyDir, readdir, rename } from "fs-extra"
+import { asArray, copyDir, DO_NOT_USE_HARD_LINKS, executeAppBuilder, isEmptyOrSpaces, log, MAX_FILE_REQUESTS, statOrNull, unlinkIfExists } from "builder-util"
+import { emptyDir, readdir, rename, rm } from "fs-extra"
 import * as path from "path"
+import asyncPool from "tiny-async-pool"
 import { Configuration } from "../configuration"
 import { BeforeCopyExtraFilesOptions, Framework, PrepareApplicationStageDirectoryOptions } from "../Framework"
 import { Packager, Platform } from "../index"
 import { LinuxPackager } from "../linuxPackager"
-import MacPackager from "../macPackager"
+import { MacPackager } from "../macPackager"
 import { getTemplatePath } from "../util/pathManager"
+import { resolveFunction } from "../util/resolve"
 import { createMacApp } from "./electronMac"
 import { computeElectronVersion, getElectronVersionFromInstalled } from "./electronVersion"
-import * as fs from "fs/promises"
+import { addWinAsarIntegrity } from "./electronWin"
 import injectFFMPEG from "./injectFFMPEG"
 
 export type ElectronPlatformName = "darwin" | "linux" | "win32" | "mas"
@@ -78,6 +78,9 @@ async function beforeCopyExtraFiles(options: BeforeCopyExtraFilesOptions) {
   } else if (packager.platform === Platform.WINDOWS) {
     const executable = path.join(appOutDir, `${packager.appInfo.productFilename}.exe`)
     await rename(path.join(appOutDir, `${electronBranding.projectName}.exe`), executable)
+    if (options.asarIntegrity) {
+      await addWinAsarIntegrity(executable, options.asarIntegrity)
+    }
   } else {
     await createMacApp(packager as MacPackager, appOutDir, options.asarIntegrity, (options.platformName as ElectronPlatformName) === "mas")
   }
@@ -93,31 +96,29 @@ async function removeUnusedLanguagesIfNeeded(options: BeforeCopyExtraFilesOption
     return
   }
 
-  const { dir, langFileExt } = getLocalesConfig(options)
+  const { dirs, langFileExt } = getLocalesConfig(options)
   // noinspection SpellCheckingInspection
-  await BluebirdPromise.map(
-    readdir(dir),
-    file => {
-      if (!file.endsWith(langFileExt)) {
+  const deletedFiles = async (dir: string) => {
+    await asyncPool(MAX_FILE_REQUESTS, await readdir(dir), async file => {
+      if (path.extname(file) !== langFileExt) {
         return
       }
 
-      const language = file.substring(0, file.length - langFileExt.length)
+      const language = path.basename(file, langFileExt)
       if (!wantedLanguages.includes(language)) {
-        return fs.rm(path.join(dir, file), { recursive: true, force: true })
+        return rm(path.join(dir, file), { recursive: true, force: true })
       }
       return
-    },
-    CONCURRENCY
-  )
+    })
+  }
+  await Promise.all(dirs.map(deletedFiles))
 
   function getLocalesConfig(options: BeforeCopyExtraFilesOptions) {
     const { appOutDir, packager } = options
     if (packager.platform === Platform.MAC) {
-      return { dir: packager.getResourcesDir(appOutDir), langFileExt: ".lproj" }
-    } else {
-      return { dir: path.join(packager.getResourcesDir(appOutDir), "..", "locales"), langFileExt: ".pak" }
+      return { dirs: [packager.getResourcesDir(appOutDir), packager.getMacOsElectronFrameworkResourcesDir(appOutDir)], langFileExt: ".lproj" }
     }
+    return { dirs: [path.join(packager.getResourcesDir(appOutDir), "..", "locales")], langFileExt: ".pak" }
   }
 }
 
@@ -131,7 +132,11 @@ class ElectronFramework implements Framework {
   // noinspection JSUnusedGlobalSymbols
   readonly isNpmRebuildRequired = true
 
-  constructor(readonly name: string, readonly version: string, readonly distMacOsAppName: string) {}
+  constructor(
+    readonly name: string,
+    readonly version: string,
+    readonly distMacOsAppName: string
+  ) {}
 
   getDefaultIcon(platform: Platform) {
     if (platform === Platform.LINUX) {
@@ -143,7 +148,9 @@ class ElectronFramework implements Framework {
   }
 
   async prepareApplicationStageDirectory(options: PrepareApplicationStageDirectoryOptions) {
-    await unpack(options, createDownloadOpts(options.packager.config, options.platformName, options.arch, this.version), this.distMacOsAppName)
+    const downloadOptions = createDownloadOpts(options.packager.config, options.platformName, options.arch, this.version)
+    const shouldCleanup = await unpack(options, downloadOptions, this.distMacOsAppName)
+    await cleanupAfterUnpack(options, this.distMacOsAppName, shouldCleanup)
     if (options.packager.config.downloadAlternateFFmpeg) {
       await injectFFMPEG(options, this.version)
     }
@@ -173,36 +180,89 @@ export async function createElectronFrameworkSupport(configuration: Configuratio
   return new ElectronFramework(branding.projectName, version, `${branding.productName}.app`)
 }
 
-async function unpack(prepareOptions: PrepareApplicationStageDirectoryOptions, options: ElectronDownloadOptions, distMacOsAppName: string) {
-  const { packager, appOutDir, platformName } = prepareOptions
-
-  const electronDist = packager.config.electronDist
-  let dist: string | undefined | null = typeof electronDist === "function" ? electronDist(prepareOptions) : electronDist
-  if (dist != null) {
-    const zipFile = `electron-v${options.version}-${platformName}-${options.arch}.zip`
-    const resolvedDist = path.isAbsolute(dist) ? dist : path.resolve(packager.projectDir, dist)
-    if ((await statOrNull(path.join(resolvedDist, zipFile))) != null) {
-      log.info({ resolvedDist, zipFile }, "resolved electronDist")
-      options.cache = resolvedDist
-      dist = null
-    }
+/**
+ * Unpacks a custom or default Electron distribution into the app output directory.
+ */
+async function unpack(prepareOptions: PrepareApplicationStageDirectoryOptions, downloadOptions: ElectronDownloadOptions, distMacOsAppName: string): Promise<boolean> {
+  const downloadUsingAdjustedConfig = (options: ElectronDownloadOptions) => {
+    return executeAppBuilder(["unpack-electron", "--configuration", JSON.stringify([options]), "--output", appOutDir, "--distMacOsAppName", distMacOsAppName])
   }
 
-  let isFullCleanup = false
-  if (dist == null) {
-    await executeAppBuilder(["unpack-electron", "--configuration", JSON.stringify([options]), "--output", appOutDir, "--distMacOsAppName", distMacOsAppName])
-  } else {
-    isFullCleanup = true
-    const source = packager.getElectronSrcDir(dist)
+  const copyUnpackedElectronDistribution = async (folderPath: string) => {
+    log.info({ electronDist: log.filePath(folderPath) }, "using custom unpacked Electron distribution")
+    const source = packager.getElectronSrcDir(folderPath)
     const destination = packager.getElectronDestinationDir(appOutDir)
-    log.info({ source, destination }, "copying Electron")
+    log.info({ source, destination }, "copying unpacked Electron")
     await emptyDir(appOutDir)
     await copyDir(source, destination, {
       isUseHardLink: DO_NOT_USE_HARD_LINKS,
     })
+    return false
   }
 
-  await cleanupAfterUnpack(prepareOptions, distMacOsAppName, isFullCleanup)
+  const selectElectron = async (filepath: string) => {
+    const resolvedDist = path.isAbsolute(filepath) ? filepath : path.resolve(packager.projectDir, filepath)
+
+    const electronDistStats = await statOrNull(resolvedDist)
+    if (!electronDistStats) {
+      throw new Error(
+        `The specified electronDist does not exist: ${resolvedDist}. Please provide a valid path to the Electron zip file, cache directory, or electron build directory.`
+      )
+    }
+
+    if (resolvedDist.endsWith(".zip")) {
+      log.info({ zipFile: resolvedDist }, "using custom electronDist zip file")
+      await downloadUsingAdjustedConfig({
+        ...downloadOptions,
+        cache: path.dirname(resolvedDist), // set custom directory to the zip file's directory
+        customFilename: path.basename(resolvedDist), // set custom filename to the zip file's name
+      })
+      return false // do not clean up after unpacking, it's a custom bundle and we should respect its configuration/contents as required
+    }
+
+    if (electronDistStats.isDirectory()) {
+      // backward compatibility: if electronDist is a directory, check for the default zip file inside it
+      const files = await readdir(resolvedDist)
+      if (files.includes(defaultZipName)) {
+        log.info({ electronDist: log.filePath(resolvedDist) }, "using custom electronDist directory")
+        await downloadUsingAdjustedConfig({
+          ...downloadOptions,
+          cache: resolvedDist,
+          customFilename: defaultZipName,
+        })
+        return false
+      }
+      // if we reach here, it means the provided electronDist is neither a zip file nor a directory with the default zip file
+      // e.g. we treat it as a custom already-unpacked Electron distribution
+      return await copyUnpackedElectronDistribution(resolvedDist)
+    }
+    throw new Error(`The specified electronDist is neither a zip file nor a directory: ${resolvedDist}. Please provide a valid path to the Electron zip file or cache directory.`)
+  }
+
+  const { packager, appOutDir, platformName } = prepareOptions
+  const { version, arch } = downloadOptions
+  const defaultZipName = `electron-v${version}-${platformName}-${arch}.zip`
+
+  const electronDist = packager.config.electronDist
+  if (typeof electronDist === "string" && !isEmptyOrSpaces(electronDist)) {
+    return selectElectron(electronDist)
+  }
+
+  let resolvedDist: string | null = null
+  try {
+    const electronDistHook: any = await resolveFunction(packager.appInfo.type, electronDist, "electronDist")
+    resolvedDist = typeof electronDistHook === "function" ? await Promise.resolve(electronDistHook(prepareOptions)) : electronDistHook
+  } catch (error: any) {
+    log.warn({ error }, "Failed to resolve electronDist, using default unpack logic")
+  }
+
+  if (resolvedDist == null) {
+    // if no custom electronDist is provided, use the default unpack logic
+    log.debug(null, "no custom electronDist provided, unpacking default Electron distribution")
+    await downloadUsingAdjustedConfig(downloadOptions)
+    return true // indicates that we should clean up after unpacking
+  }
+  return selectElectron(resolvedDist)
 }
 
 function cleanupAfterUnpack(prepareOptions: PrepareApplicationStageDirectoryOptions, distMacOsAppName: string, isFullCleanup: boolean) {

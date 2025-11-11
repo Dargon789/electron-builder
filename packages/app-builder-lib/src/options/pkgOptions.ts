@@ -58,7 +58,7 @@ export interface PkgOptions extends TargetSpecificOptions {
   readonly allowRootDirectory?: boolean | null
 
   /**
-   * The name of certificate to use when signing. Consider using environment variables [CSC_LINK or CSC_NAME](/code-signing) instead of specifying this option.
+   * The name of certificate to use when signing. Consider using environment variables [CSC_LINK or CSC_NAME](./code-signing.md) instead of specifying this option.
    */
   readonly identity?: string | null
 
@@ -126,6 +126,12 @@ export interface PkgOptions extends TargetSpecificOptions {
    * @default upgrade
    */
   readonly overwriteAction?: "upgrade" | "update" | null
+
+  /**
+   * The extra component packages directory (relative to build resources directory) for MacOS product archive
+   * Autoscans directory for any `.pkg` files and adds to `productbuild` command as `--package-path` and `--package` accordingly
+   */
+  readonly extraPkgsDir?: string | null
 }
 
 /**

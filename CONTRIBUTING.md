@@ -7,14 +7,21 @@ This repository has a mono-repo structure consisting of multiple packages. Try t
 
 ## Prerequisites
 
-> All prerequisites could be installed via script at the end of the chapter
+- [pnpm](https://pnpm.js.org) is required.
 
-- [pnpm](https://pnpm.js.org) is required because NPM is not reliable and Yarn 2 is not as good as PNPM. Currently we use the latest version 7.x of PNPM, please use the same version to ensure that lockfiles are compatible.
-- For local development, you can use [yalc](https://github.com/whitecolor/yalc) in order to apply changes made to
+Use `corepack` to activate the correct version of pnpm for this project.
+
+For local development:
+### New dev route
+https://pnpm.io/cli/link
+
+### Legacy dev Route
+
+You can use [yalc](https://github.com/whitecolor/yalc) in order to apply changes made to
   electron-builder for your other projects to leverage and test with.
 
 ```
-npm i -g pnpm@latest-8
+npm i -g pnpm
 pnpm i yalc -g
 ```
 
@@ -104,17 +111,23 @@ our git [commit messages can be formatted](https://gist.github.com/develar/273e2
 
 ## Documentation
 
-Documentation files located in the `/docs`.
+Documentation files located in the `/pages`.
 
 `/docs` is deployed to Netlify on every release and available for all users.
 
-`bash netlify-docs.sh` to setup local env (Python 3) and build.
-
-Build command: `mkdocs build`.
+Build commands:
+```
+pnpm docs:prebuild # docker image
+pnpm docs:prebuild
+pnpm docs:mkdocs
+pnpm docs:preview # (optional) open in browser
+```
 
 ## Debug Tests
 
-Only IntelliJ Platform IDEs ([IntelliJ IDEA](https://confluence.jetbrains.com/display/IDEADEV/IDEA+2017.1+EAP),
+### IntelliJ
+
+IntelliJ Platform IDEs ([IntelliJ IDEA](https://confluence.jetbrains.com/display/IDEADEV/IDEA+2017.1+EAP),
 [WebStorm](https://confluence.jetbrains.com/display/WI/WebStorm+EAP)) support debug.
 
 If you use IntelliJ IDEA or WebStorm — [ij-rc-producer](https://github.com/develar/ij-rc-producer) is used and you
@@ -133,15 +146,18 @@ Or you can create the Node.js run configuration manually:
     uses temporary directory (only if `--match` is used). Specified directory will be used instead of random
     temporary directory and _cleared_ on each run.
 
+### VSCode
+
+Config is committed to the repo, it should auto-setup. Just make sure to run `pnpm compile` first (or `pnpm compile --watch` in a separate terminal)
+
 ### Run Test using CLI
 
 ```sh
 pnpm compile
-TEST_APP_TMP_DIR=/tmp/electron-builder-test ./node_modules/.bin/jest --env jest-environment-node-debug -t 'assisted' '/oneClickInstallerTest\.\w+$'
+TEST_APP_TMP_DIR=/tmp/electron-builder-test TEST_FILES=oneClickInstallerTest,assistedInstallerTest,webInstallerTest pnpm ci:test'
 ```
 
-where `TEST_APP_TMP_DIR` is specified to easily inspect and use test build, `assisted` is the test name
-and `/oneClickInstallerTest\.\w+$` is the path to test file.
+where `TEST_APP_TMP_DIR` is specified to easily inspect and use test build, `oneClickInstallerTest` is the test filename
 
 ## Issues
 
@@ -154,4 +170,4 @@ This includes:
 - log of the terminal output
 - node version
 - npm version
-- on which system do you want to create installers (macOS, Linux or Windows).
+- electron-builder config

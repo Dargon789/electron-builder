@@ -1,21 +1,21 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`custom provider 1`] = `
-Object {
-  "linux": Array [
-    Object {
+{
+  "linux": [
+    {
       "arch": "x64",
       "file": "TestApp_1.1.0_amd64.deb",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
     },
-    Object {
+    {
       "file": "latest-linux.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp_1.1.0_amd64.deb",
@@ -32,7 +32,7 @@ Object {
 `;
 
 exports[`custom provider 2`] = `
-Array [
+[
   "/",
   "/opt/",
   "/usr/",
@@ -58,10 +58,8 @@ Array [
   "/opt/Test App ßW/resources/",
   "/opt/Test App ßW/resources/app-update.yml",
   "/opt/Test App ßW/resources/app.asar",
+  "/opt/Test App ßW/resources/apparmor-profile",
   "/opt/Test App ßW/resources/package-type",
-  "/opt/Test App ßW/swiftshader/",
-  "/opt/Test App ßW/swiftshader/libEGL.so",
-  "/opt/Test App ßW/swiftshader/libGLESv2.so",
   "/usr/share/applications/",
   "/usr/share/applications/testapp.desktop",
   "/usr/share/doc/",
@@ -94,7 +92,7 @@ Array [
 `;
 
 exports[`custom provider 3`] = `
-Object {
+{
   "Architecture": "amd64",
   "Depends": "libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0",
   "Homepage": "http://foo.example.com",
@@ -111,9 +109,9 @@ Object {
 exports[`custom provider 4`] = `"Test Application (test quite “ #378)"`;
 
 exports[`dotted s3 bucket 1`] = `
-Object {
-  "linux": Array [
-    Object {
+{
+  "linux": [
+    {
       "arch": "x64",
       "file": "TestApp-1.1.0.zip",
     },
@@ -122,13 +120,13 @@ Object {
 `;
 
 exports[`generic, github and spaces 1`] = `
-Object {
-  "mac": Array [
-    Object {
+{
+  "mac": [
+    {
       "file": "alpha-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -140,11 +138,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "alpha-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -156,11 +154,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "beta-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -172,11 +170,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "beta-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -188,11 +186,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -204,11 +202,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -220,11 +218,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "TestApp-1.1.0-mac.zip",
@@ -236,19 +234,19 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "arch": "x64",
       "file": "Test App ßW-1.1.0-mac.zip",
       "safeArtifactName": "TestApp-1.1.0-mac.zip",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
     },
-    Object {
+    {
       "file": "Test App ßW-1.1.0-mac.zip.blockmap",
       "safeArtifactName": "Test App ßW-1.1.0-mac.zip.blockmap",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
@@ -258,7 +256,7 @@ Object {
 `;
 
 exports[`generic, github and spaces 2`] = `
-Object {
+{
   "CFBundleDisplayName": "Test App ßW",
   "CFBundleExecutable": "Test App ßW",
   "CFBundleIconFile": "icon.icns",
@@ -267,18 +265,27 @@ Object {
   "CFBundleName": "Test App ßW",
   "CFBundlePackageType": "APPL",
   "CFBundleShortVersionString": "1.1.0",
+  "ElectronAsarIntegrity": {
+    "Resources/app.asar": {
+      "algorithm": "SHA256",
+      "hash": "hash",
+    },
+  },
   "LSApplicationCategoryType": "your.app.category.type",
-  "NSAppTransportSecurity": Object {
+  "LSEnvironment": {
+    "MallocNanoZone": "0",
+  },
+  "NSAppTransportSecurity": {
     "NSAllowsLocalNetworking": true,
-    "NSExceptionDomains": Object {
-      "127.0.0.1": Object {
+    "NSExceptionDomains": {
+      "127.0.0.1": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
         "NSTemporaryExceptionMinimumTLSVersion": "1.0",
         "NSTemporaryExceptionRequiresForwardSecrecy": false,
       },
-      "localhost": Object {
+      "localhost": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
@@ -296,23 +303,23 @@ Object {
 `;
 
 exports[`github and spaces (publishAutoUpdate) 1`] = `
-Object {
-  "linux": Array [
-    Object {
+{
+  "linux": [
+    {
       "arch": "x64",
       "file": "Test App ßW-1.1.0.AppImage",
       "safeArtifactName": "TestApp-1.1.0-x86_64.AppImage",
-      "updateInfo": Object {
+      "updateInfo": {
         "blockMapSize": "@blockMapSize",
         "sha512": "@sha512",
         "size": "@size",
       },
     },
-    Object {
+    {
       "file": "latest-linux.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "blockMapSize": "@blockMapSize",
             "sha512": "@sha512",
             "size": "@size",
@@ -330,13 +337,13 @@ Object {
 `;
 
 exports[`mac artifactName  1`] = `
-Object {
-  "mac": Array [
-    Object {
+{
+  "mac": [
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "Test App ßW_1.1.0_mac.zip",
@@ -348,11 +355,11 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "Test App ßW_1.1.0_mac.zip",
@@ -364,19 +371,19 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "arch": "x64",
       "file": "Test App ßW_1.1.0_mac.zip",
       "safeArtifactName": "TestApp-1.1.0-mac.zip",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
     },
-    Object {
+    {
       "file": "Test App ßW_1.1.0_mac.zip.blockmap",
       "safeArtifactName": "Test App ßW_1.1.0_mac.zip.blockmap",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
@@ -386,7 +393,7 @@ Object {
 `;
 
 exports[`mac artifactName  2`] = `
-Object {
+{
   "CFBundleDisplayName": "Test App ßW",
   "CFBundleExecutable": "Test App ßW",
   "CFBundleIconFile": "icon.icns",
@@ -397,17 +404,17 @@ Object {
   "CFBundleShortVersionString": "1.1.0",
   "LSApplicationCategoryType": "your.app.category.type",
   "LSRequiresNativeExecution": true,
-  "NSAppTransportSecurity": Object {
+  "NSAppTransportSecurity": {
     "NSAllowsLocalNetworking": true,
-    "NSExceptionDomains": Object {
-      "127.0.0.1": Object {
+    "NSExceptionDomains": {
+      "127.0.0.1": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
         "NSTemporaryExceptionMinimumTLSVersion": "1.0",
         "NSTemporaryExceptionRequiresForwardSecrecy": false,
       },
-      "localhost": Object {
+      "localhost": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
@@ -423,19 +430,19 @@ Object {
 `;
 
 exports[`os macro 1`] = `
-Object {
-  "linux": Array [
-    Object {
+{
+  "linux": [
+    {
       "arch": "x64",
       "file": "TestApp-1.1.0.zip",
     },
   ],
-  "mac": Array [
-    Object {
+  "mac": [
+    {
       "file": "latest-mac.yml",
-      "fileContent": Object {
-        "files": Array [
-          Object {
+      "fileContent": {
+        "files": [
+          {
             "sha512": "@sha512",
             "size": "@size",
             "url": "Test App ßW-1.1.0-mac.zip",
@@ -447,19 +454,19 @@ Object {
         "version": "1.1.0",
       },
     },
-    Object {
+    {
       "arch": "x64",
       "file": "Test App ßW-1.1.0-mac.zip",
       "safeArtifactName": "TestApp-1.1.0-mac.zip",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
     },
-    Object {
+    {
       "file": "Test App ßW-1.1.0-mac.zip.blockmap",
       "safeArtifactName": "Test App ßW-1.1.0-mac.zip.blockmap",
-      "updateInfo": Object {
+      "updateInfo": {
         "sha512": "@sha512",
         "size": "@size",
       },
@@ -469,7 +476,7 @@ Object {
 `;
 
 exports[`os macro 2`] = `
-Object {
+{
   "CFBundleDisplayName": "Test App ßW",
   "CFBundleExecutable": "Test App ßW",
   "CFBundleIconFile": "icon.icns",
@@ -478,18 +485,27 @@ Object {
   "CFBundleName": "Test App ßW",
   "CFBundlePackageType": "APPL",
   "CFBundleShortVersionString": "1.1.0",
+  "ElectronAsarIntegrity": {
+    "Resources/app.asar": {
+      "algorithm": "SHA256",
+      "hash": "hash",
+    },
+  },
   "LSApplicationCategoryType": "your.app.category.type",
-  "NSAppTransportSecurity": Object {
+  "LSEnvironment": {
+    "MallocNanoZone": "0",
+  },
+  "NSAppTransportSecurity": {
     "NSAllowsLocalNetworking": true,
-    "NSExceptionDomains": Object {
-      "127.0.0.1": Object {
+    "NSExceptionDomains": {
+      "127.0.0.1": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
         "NSTemporaryExceptionMinimumTLSVersion": "1.0",
         "NSTemporaryExceptionRequiresForwardSecrecy": false,
       },
-      "localhost": Object {
+      "localhost": {
         "NSIncludesSubdomains": false,
         "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
         "NSTemporaryExceptionAllowsInsecureHTTPSLoads": false,
@@ -507,7 +523,7 @@ Object {
 `;
 
 exports[`os macro 3`] = `
-Array [
+[
   "latest/mac/Test App ßW-1.1.0-mac.zip",
   "latest/mac/Test App ßW-1.1.0-mac.zip.blockmap",
   "latest/mac/latest-mac.yml",

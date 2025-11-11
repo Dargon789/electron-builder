@@ -1,15 +1,15 @@
-import { InvalidConfigurationError, log } from "builder-util"
+import { httpExecutor, InvalidConfigurationError, log } from "builder-util"
 import { parseXml } from "builder-util-runtime"
-import { httpExecutor } from "builder-util/out/nodeHttpExecutor"
 import { readJson } from "fs-extra"
 import { Lazy } from "lazy-val"
 import * as path from "path"
-import { orNullIfFileNotExist } from "read-config-file"
 import * as semver from "semver"
 import { Configuration } from "../configuration"
-import { getConfig } from "../util/config"
+import { getConfig } from "../util/config/config"
+import { orNullIfFileNotExist } from "../util/config/load"
+import { getProjectRootPath } from "./search-module"
 
-export type MetadataValue = Lazy<{ [key: string]: any } | null>
+export type MetadataValue = Lazy<Record<string, any> | null>
 
 const electronPackages = ["electron", "electron-prebuilt", "electron-prebuilt-compile", "electron-nightly"]
 
@@ -56,8 +56,15 @@ export async function computeElectronVersion(projectDir: string): Promise<string
     return result
   }
 
-  const metadata = await orNullIfFileNotExist(readJson(path.join(projectDir, "package.json")))
-  const dependency = metadata ? findFromPackageMetadata(metadata) : null
+  const potentialRootDirs = [projectDir, await getProjectRootPath(projectDir)]
+  let dependency: NameAndVersion | null = null
+  for (const dir of potentialRootDirs) {
+    const metadata = await orNullIfFileNotExist(readJson(path.join(dir, "package.json")))
+    dependency = metadata ? findFromPackageMetadata(metadata) : null
+    if (dependency) {
+      break
+    }
+  }
   if (dependency?.name === "electron-nightly") {
     log.info("You are using a nightly version of electron, be warned that those builds are highly unstable.")
     const feedXml = await httpExecutor.request({
@@ -100,7 +107,7 @@ export async function computeElectronVersion(projectDir: string): Promise<string
     )
   }
 
-  return semver.coerce(version)!.toString()
+  return semver.coerce(version)!.format()
 }
 
 interface NameAndVersion {

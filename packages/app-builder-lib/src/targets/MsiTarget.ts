@@ -1,14 +1,12 @@
-import BluebirdPromise from "bluebird-lst"
-import { Arch, asArray, log, deepAssign } from "builder-util"
+import { Arch, asArray, deepAssign, log, walk } from "builder-util"
 import { UUID } from "builder-util-runtime"
-import { getBinFromUrl } from "../binDownload"
-import { walk } from "builder-util/out/fs"
 import { createHash } from "crypto"
 import * as ejs from "ejs"
 import { readFile, writeFile } from "fs/promises"
 import { Lazy } from "lazy-val"
 import * as path from "path"
 import { MsiOptions } from "../"
+import { getBinFromUrl } from "../binDownload"
 import { Target } from "../core"
 import { DesktopShortcutCreationPolicy, FinalCommonWindowsInstallerOptions, getEffectiveOptions } from "../options/CommonWindowsInstallerConfiguration"
 import { normalizeExt } from "../platformPackager"
@@ -27,7 +25,12 @@ export default class MsiTarget extends Target {
 
   readonly options: MsiOptions = deepAssign(this.packager.platformSpecificBuildOptions, this.packager.config.msi)
 
-  constructor(protected readonly packager: WinPackager, readonly outDir: string, name = "msi", isAsyncSupported = true) {
+  constructor(
+    protected readonly packager: WinPackager,
+    readonly outDir: string,
+    name = "msi",
+    isAsyncSupported = true
+  ) {
     super(name, isAsyncSupported)
   }
 
@@ -59,7 +62,7 @@ export default class MsiTarget extends Target {
     const packager = this.packager
     const artifactName = packager.expandArtifactBeautyNamePattern(this.options, "msi", arch)
     const artifactPath = path.join(this.outDir, artifactName)
-    await packager.info.callArtifactBuildStarted({
+    await packager.info.emitArtifactBuildStarted({
       targetPresentableName: "MSI",
       file: artifactPath,
       arch,
@@ -70,17 +73,23 @@ export default class MsiTarget extends Target {
 
     const commonOptions = getEffectiveOptions(this.options, this.packager)
 
+    // wix 4.0.0.5512.2 doesn't support the arm64 architecture so default to x64 when building for arm64.
+    // This will result in an x64 MSI installer that installs an arm64 version of the application. This is a
+    // stopgap until the electron-builder-binaries wix version is upgraded to a version that supports arm64:
+    // https://github.com/electron-userland/electron-builder/issues/6077
+    const wixArch = arch == Arch.arm64 ? Arch.x64 : arch
+
     const projectFile = stageDir.getTempFile("project.wxs")
     const objectFiles = ["project.wixobj"]
-    await writeFile(projectFile, await this.writeManifest(appOutDir, arch, commonOptions))
+    await writeFile(projectFile, await this.writeManifest(appOutDir, wixArch, commonOptions))
 
-    await packager.info.callMsiProjectCreated(projectFile)
-
-    // noinspection SpellCheckingInspection
-    const vendorPath = await getBinFromUrl("wix", "4.0.0.5512.2", "/X5poahdCc3199Vt6AP7gluTlT1nxi9cbbHhZhCMEu+ngyP1LiBMn+oZX7QAZVaKeBMc2SjVp7fJqNLqsUnPNQ==")
+    await packager.info.emitMsiProjectCreated(projectFile)
 
     // noinspection SpellCheckingInspection
-    const candleArgs = ["-arch", arch === Arch.ia32 ? "x86" : arch === Arch.arm64 ? "arm64" : "x64", `-dappDir=${vm.toVmFile(appOutDir)}`].concat(this.getCommonWixArgs())
+    const vendorPath = await getBinFromUrl("wix-4.0.0.5512.2", "wix-4.0.0.5512.2.7z", "/X5poahdCc3199Vt6AP7gluTlT1nxi9cbbHhZhCMEu+ngyP1LiBMn+oZX7QAZVaKeBMc2SjVp7fJqNLqsUnPNQ==")
+
+    // noinspection SpellCheckingInspection
+    const candleArgs = ["-arch", wixArch === Arch.ia32 ? "x86" : "x64", `-dappDir=${vm.toVmFile(appOutDir)}`].concat(this.getCommonWixArgs())
     candleArgs.push("project.wxs")
     await vm.exec(vm.toVmFile(path.join(vendorPath, "candle.exe")), candleArgs, {
       cwd: stageDir.dir,
@@ -92,7 +101,7 @@ export default class MsiTarget extends Target {
 
     await packager.sign(artifactPath)
 
-    await packager.info.callArtifactBuildCompleted({
+    await packager.info.emitArtifactBuildCompleted({
       file: artifactPath,
       packager,
       arch,
@@ -115,7 +124,9 @@ export default class MsiTarget extends Target {
       "-sw1076",
       `-dappDir=${vm.toVmFile(appOutDir)}`,
       // "-dcl:high",
-    ].concat(this.getCommonWixArgs())
+    ]
+      .concat(this.getCommonWixArgs())
+      .concat(this.getAdditionalLightArgs())
 
     // http://windows-installer-xml-wix-toolset.687559.n2.nabble.com/Build-3-5-2229-0-give-me-the-following-error-error-LGHT0216-An-unexpected-Win32-exception-with-errorn-td5707443.html
     if (process.platform !== "win32") {
@@ -134,6 +145,14 @@ export default class MsiTarget extends Target {
     })
   }
 
+  private getAdditionalLightArgs() {
+    const args: Array<string> = []
+    if (this.options.additionalLightArgs != null) {
+      args.push(...this.options.additionalLightArgs)
+    }
+    return args
+  }
+
   private getCommonWixArgs() {
     const args: Array<string> = ["-pedantic"]
     if (this.options.warningsAsErrors !== false) {
@@ -145,7 +164,7 @@ export default class MsiTarget extends Target {
     return args
   }
 
-  protected async writeManifest(appOutDir: string, arch: Arch, commonOptions: FinalCommonWindowsInstallerOptions) {
+  protected async writeManifest(appOutDir: string, wixArch: Arch, commonOptions: FinalCommonWindowsInstallerOptions) {
     const appInfo = this.packager.appInfo
     const { files, dirs } = await this.computeFileDeclaration(appOutDir)
     const options = this.options
@@ -155,7 +174,7 @@ export default class MsiTarget extends Target {
       isCreateDesktopShortcut: commonOptions.isCreateDesktopShortcut !== DesktopShortcutCreationPolicy.NEVER,
       isRunAfterFinish: options.runAfterFinish !== false,
       // https://stackoverflow.com/questions/1929038/compilation-error-ice80-the-64bitcomponent-uses-32bitdirectory
-      programFilesId: arch === Arch.x64 ? "ProgramFiles64Folder" : "ProgramFilesFolder",
+      programFilesId: wixArch === Arch.x64 ? "ProgramFiles64Folder" : "ProgramFilesFolder",
       // wix in the name because special wix format can be used in the name
       installationDirectoryWixName: getWindowsInstallationDirName(appInfo, commonOptions.isAssisted || commonOptions.isPerMachine === true),
       dirs,
@@ -193,7 +212,7 @@ export default class MsiTarget extends Target {
     const dirs: Array<string> = []
     const fileSpace = " ".repeat(6)
     const commonOptions = getEffectiveOptions(this.options, this.packager)
-    const files = await BluebirdPromise.map(walk(appOutDir), file => {
+    const files = (await walk(appOutDir)).map(file => {
       const packagePath = file.substring(appOutDir.length + 1)
 
       const lastSlash = packagePath.lastIndexOf(path.sep)

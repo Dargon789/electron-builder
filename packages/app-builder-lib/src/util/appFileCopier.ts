@@ -1,10 +1,9 @@
-import BluebirdPromise from "bluebird-lst"
-import { AsyncTaskManager, log } from "builder-util"
-import { CONCURRENCY, FileCopier, FileTransformer, Link, MAX_FILE_REQUESTS, statOrNull, walk } from "builder-util/out/fs"
+import { AsyncTaskManager, FileCopier, FileTransformer, Link, log, MAX_FILE_REQUESTS, statOrNull, walk } from "builder-util"
 import { Stats } from "fs"
-import { mkdir, readlink } from "fs/promises"
 import { ensureSymlink } from "fs-extra"
+import { mkdir, readlink } from "fs/promises"
 import * as path from "path"
+import asyncPool from "tiny-async-pool"
 import { isLibOrExe } from "../asar/unpackDetector"
 import { Platform } from "../core"
 import { excludedExts, FileMatcher } from "../fileMatcher"
@@ -13,6 +12,8 @@ import { Packager } from "../packager"
 import { PlatformPackager } from "../platformPackager"
 import { AppFileWalker } from "./AppFileWalker"
 import { NodeModuleCopyHelper } from "./NodeModuleCopyHelper"
+import { NodeModuleInfo } from "./packageDependencies"
+import { getNodeModules, detectPackageManager } from "../node-module-collector"
 
 const BOWER_COMPONENTS_PATTERN = `${path.sep}bower_components${path.sep}`
 /** @internal */
@@ -21,25 +22,15 @@ export const ELECTRON_COMPILE_SHIM_FILENAME = "__shim.js"
 export function getDestinationPath(file: string, fileSet: ResolvedFileSet) {
   if (file === fileSet.src) {
     return fileSet.destination
-  } else {
-    const src = fileSet.src
-    const dest = fileSet.destination
-    if (file.length > src.length && file.startsWith(src) && file[src.length] === path.sep) {
-      return dest + file.substring(src.length)
-    } else {
-      // hoisted node_modules
-      // not lastIndexOf, to ensure that nested module (top-level module depends on) copied to parent node_modules, not to top-level directory
-      // project https://github.com/angexis/punchcontrol/commit/cf929aba55c40d0d8901c54df7945e1d001ce022
-      let index = file.indexOf(NODE_MODULES_PATTERN)
-      if (index < 0 && file.endsWith(`${path.sep}node_modules`)) {
-        index = file.length - 13
-      }
-      if (index < 0) {
-        throw new Error(`File "${file}" not under the source directory "${fileSet.src}"`)
-      }
-      return dest + file.substring(index)
-    }
   }
+
+  const src = fileSet.src
+  const dest = fileSet.destination
+  // get node_modules path relative to src and then append to dest
+  if (file.startsWith(src)) {
+    return path.join(dest, path.relative(src, file))
+  }
+  return dest
 }
 
 export async function copyAppFiles(fileSet: ResolvedFileSet, packager: Packager, transformer: FileTransformer) {
@@ -49,8 +40,7 @@ export async function copyAppFiles(fileSet: ResolvedFileSet, packager: Packager,
   const createdParentDirs = new Set<string>()
 
   const fileCopier = new FileCopier(file => {
-    // https://github.com/electron-userland/electron-builder/issues/3038
-    return !(isLibOrExe(file) || file.endsWith(".node"))
+    return !isLibOrExe(file)
   }, transformer)
   const links: Array<Link> = []
   for (let i = 0, n = fileSet.files.length; i < n; i++) {
@@ -82,9 +72,8 @@ export async function copyAppFiles(fileSet: ResolvedFileSet, packager: Packager,
   if (taskManager.tasks.length > 0) {
     await taskManager.awaitTasks()
   }
-  if (links.length > 0) {
-    await BluebirdPromise.map(links, it => ensureSymlink(it.link, it.file), CONCURRENCY)
-  }
+
+  await asyncPool(MAX_FILE_REQUESTS, links, it => ensureSymlink(it.link, it.file))
 }
 
 // os path separator is used
@@ -110,32 +99,30 @@ export async function transformFiles(transformer: FileTransformer, fileSet: Reso
   }
 
   const metadata = fileSet.metadata
-  await BluebirdPromise.filter(
-    fileSet.files,
-    (it, index) => {
-      const fileStat = metadata.get(it)
-      if (fileStat == null || !fileStat.isFile()) {
-        return false
-      }
+  const filesPromise = fileSet.files.map(async (it, index) => {
+    const fileStat = metadata.get(it)
+    if (fileStat == null || !fileStat.isFile()) {
+      return
+    }
 
-      const transformedValue = transformer(it)
-      if (transformedValue == null) {
-        return false
-      }
+    const transformedValue = transformer(it)
+    if (transformedValue == null) {
+      return
+    }
 
-      if (typeof transformedValue === "object" && "then" in transformedValue) {
-        return (transformedValue as Promise<any>).then(it => {
-          if (it != null) {
-            transformedFiles!.set(index, it)
-          }
-          return false
-        })
-      }
-      transformedFiles!.set(index, transformedValue as string | Buffer)
-      return false
-    },
-    CONCURRENCY
-  )
+    if (typeof transformedValue === "object" && "then" in transformedValue) {
+      return (transformedValue as Promise<any>).then(it => {
+        if (it != null) {
+          transformedFiles!.set(index, it)
+        }
+        return
+      })
+    }
+    transformedFiles!.set(index, transformedValue as string | Buffer)
+    return
+  })
+  // `asyncPool` doesn't provide `index` in it's handler, so we `map` first before using it
+  await asyncPool(MAX_FILE_REQUESTS, filesPromise, promise => promise)
 }
 
 export async function computeFileSets(
@@ -191,26 +178,47 @@ function validateFileSet(fileSet: ResolvedFileSet): ResolvedFileSet {
 
 /** @internal */
 export async function computeNodeModuleFileSets(platformPackager: PlatformPackager<any>, mainMatcher: FileMatcher): Promise<Array<ResolvedFileSet>> {
-  const deps = await platformPackager.info.getNodeDependencyInfo(platformPackager.platform).value
+  const projectDir = platformPackager.info.projectDir
+  const appDir = platformPackager.info.appDir
+
+  const pm = detectPackageManager(appDir === projectDir ? [appDir] : [appDir, projectDir])
+
+  let deps = await getNodeModules(pm, appDir, platformPackager.info.tempDirManager)
+  if (projectDir !== appDir && deps.length === 0) {
+    const packageJson = require(path.join(appDir, "package.json"))
+    if (Object.keys(packageJson.dependencies || {}).length > 0) {
+      log.debug({ projectDir, appDir }, "no node_modules in app dir, trying to find in project dir")
+      deps = await getNodeModules(pm, projectDir, platformPackager.info.tempDirManager)
+    }
+  }
+
+  log.debug({ nodeModules: deps }, "collected node modules")
+
   const nodeModuleExcludedExts = getNodeModuleExcludedExts(platformPackager)
   // serial execution because copyNodeModules is concurrent and so, no need to increase queue/pressure
   const result = new Array<ResolvedFileSet>()
   let index = 0
-  for (const info of deps) {
-    const source = info.dir
-    const destination = getDestinationPath(source, { src: mainMatcher.from, destination: mainMatcher.to, files: [], metadata: null as any })
+  const NODE_MODULES = "node_modules"
 
-    // use main matcher patterns, so, user can exclude some files in such hoisted node modules
-    // source here includes node_modules, but pattern base should be without because users expect that pattern "!node_modules/loot-core/src{,/**/*}" will work
-    const matcher = new FileMatcher(path.dirname(source), destination, mainMatcher.macroExpander, mainMatcher.patterns)
+  const collectNodeModules = async (dep: NodeModuleInfo, destination: string) => {
+    const source = dep.dir
+    const matcher = new FileMatcher(source, destination, mainMatcher.macroExpander, mainMatcher.patterns)
     const copier = new NodeModuleCopyHelper(matcher, platformPackager.info)
-    const files = await copier.collectNodeModules(
-      source,
-      info.deps.map(it => it.name),
-      nodeModuleExcludedExts
-    )
+    const files = await copier.collectNodeModules(dep, nodeModuleExcludedExts, path.relative(mainMatcher.to, destination))
     result[index++] = validateFileSet({ src: source, destination, files, metadata: copier.metadata })
+
+    if (dep.dependencies) {
+      for (const c of dep.dependencies) {
+        await collectNodeModules(c, path.join(destination, NODE_MODULES, c.name))
+      }
+    }
   }
+
+  for (const dep of deps) {
+    const destination = path.join(mainMatcher.to, NODE_MODULES, dep.name)
+    await collectNodeModules(dep, destination)
+  }
+
   return result
 }
 
@@ -224,22 +232,18 @@ async function compileUsingElectronCompile(mainFileSet: ResolvedFileSet, package
   const compilerHost = await createElectronCompilerHost(mainFileSet.src, cacheDir)
   const nextSlashIndex = mainFileSet.src.length + 1
   // pre-compute electron-compile to cache dir - we need to process only subdirectories, not direct files of app dir
-  await BluebirdPromise.map(
-    mainFileSet.files,
-    file => {
-      if (
-        file.includes(NODE_MODULES_PATTERN) ||
-        file.includes(BOWER_COMPONENTS_PATTERN) ||
-        !file.includes(path.sep, nextSlashIndex) || // ignore not root files
-        !mainFileSet.metadata.get(file)!.isFile()
-      ) {
-        return null
-      }
-      return compilerHost.compile(file).then(() => null)
-    },
-    CONCURRENCY
-  )
-
+  const filesPromise: Promise<any>[] = mainFileSet.files.map(file => {
+    if (
+      file.includes(NODE_MODULES_PATTERN) ||
+      file.includes(BOWER_COMPONENTS_PATTERN) ||
+      !file.includes(path.sep, nextSlashIndex) || // ignore not root files
+      !mainFileSet.metadata.get(file)!.isFile()
+    ) {
+      return
+    }
+    return compilerHost.compile(file)
+  })
+  await asyncPool(MAX_FILE_REQUESTS, filesPromise, promise => promise)
   await compilerHost.saveConfiguration()
 
   const metadata = new Map<string, Stats>()

@@ -1,8 +1,9 @@
-import { readAsar } from "app-builder-lib/out/asar/asar"
-import { walk } from "builder-util/out/fs"
+import { AsarFilesystem, readAsar } from "app-builder-lib/out/asar/asar"
+import { walk } from "builder-util"
 import { readFileSync } from "fs"
 import * as path from "path"
 import { toSystemIndependentPath } from "./packTester"
+import { ExpectStatic } from "vitest"
 
 export function removeUnstableProperties(data: any) {
   return JSON.parse(
@@ -23,11 +24,15 @@ export function removeUnstableProperties(data: any) {
   )
 }
 
-export async function verifySmartUnpack(resourceDir: string) {
+export async function verifySmartUnpack(expect: ExpectStatic, resourceDir: string, additionalVerifications?: (asarFs: AsarFilesystem) => Promise<void>) {
   const asarFs = await readAsar(path.join(resourceDir, "app.asar"))
   expect(await asarFs.readJson(`node_modules${path.sep}debug${path.sep}package.json`)).toMatchObject({
     name: "debug",
   })
+
+  // For verifying additional files within the Asar Filesystem
+  await additionalVerifications?.(asarFs)
+
   expect(removeUnstableProperties(asarFs.header)).toMatchSnapshot()
 
   const files = (await walk(resourceDir, file => !path.basename(file).startsWith(".") && !file.endsWith(`resources${path.sep}inspector`))).map(it => {

@@ -1,10 +1,10 @@
-import { asArray, isEmptyOrSpaces, log, exists } from "builder-util"
+import { asArray, exists, isEmptyOrSpaces, log } from "builder-util"
 import { outputFile } from "fs-extra"
 import { Lazy } from "lazy-val"
+import { join } from "path"
 import { LinuxPackager } from "../linuxPackager"
 import { LinuxTargetSpecificOptions } from "../options/linuxOptions"
 import { IconInfo } from "../platformPackager"
-import { join } from "path"
 
 export const installPrefix = "/opt"
 
@@ -69,7 +69,9 @@ export class LinuxTargetHelper {
     // need to put here and not as default because need to resolve image size
     const result = await packager.resolveIcon(sources, fallbackSources, "set")
     this.maxIconPath = result[result.length - 1].file
-    return result
+
+    // Ignore .icon files for linux (they are exclusive for macOS)
+    return result.filter(icon => !icon.file.endsWith(".icon"))
   }
 
   getDescription(options: LinuxTargetSpecificOptions) {
@@ -91,19 +93,19 @@ export class LinuxTargetHelper {
     }
   }
 
-  async writeDesktopEntry(targetSpecificOptions: LinuxTargetSpecificOptions, exec?: string, destination?: string | null, extra?: { [key: string]: string }): Promise<string> {
+  async writeDesktopEntry(targetSpecificOptions: LinuxTargetSpecificOptions, exec?: string, destination?: string | null, extra?: Record<string, string>): Promise<string> {
     const data = await this.computeDesktopEntry(targetSpecificOptions, exec, extra)
     const file = destination || (await this.packager.getTempFile(`${this.packager.appInfo.productFilename}.desktop`))
     await outputFile(file, data)
     return file
   }
 
-  computeDesktopEntry(targetSpecificOptions: LinuxTargetSpecificOptions, exec?: string, extra?: { [key: string]: string }): Promise<string> {
+  computeDesktopEntry(targetSpecificOptions: LinuxTargetSpecificOptions, exec?: string, extra?: Record<string, string>): Promise<string> {
     if (exec != null && exec.length === 0) {
       throw new Error("Specified exec is empty")
     }
     // https://github.com/electron-userland/electron-builder/issues/3418
-    if (targetSpecificOptions.desktop != null && targetSpecificOptions.desktop.Exec != null) {
+    if (targetSpecificOptions.desktop?.entry?.Exec) {
       throw new Error("Please specify executable name as linux.executableName instead of linux.desktop.Exec")
     }
 
@@ -140,7 +142,7 @@ export class LinuxTargetHelper {
       // https://github.com/electron/electron/blob/2-0-x/atom/browser/native_window_views.cc#L226
       StartupWMClass: appInfo.productName,
       ...extra,
-      ...targetSpecificOptions.desktop,
+      ...(targetSpecificOptions.desktop?.entry ?? {}),
     }
 
     const description = this.getDescription(targetSpecificOptions)
@@ -180,7 +182,7 @@ export class LinuxTargetHelper {
         log.warn(
           {
             reason: "linux.category is not set and cannot map from macOS",
-            docs: "https://www.electron.build/configuration/linux",
+            docs: "https://www.electron.build/linux",
           },
           'application Linux category is set to default "Utility"'
         )
@@ -194,6 +196,17 @@ export class LinuxTargetHelper {
       data += `\n${name}=${desktopMeta[name]}`
     }
     data += "\n"
+    const desktopActions = targetSpecificOptions.desktop?.desktopActions ?? {}
+    for (const [actionName, config] of Object.entries(desktopActions)) {
+      if (!Object.keys(config ?? {}).length) {
+        continue
+      }
+      data += `\n[Desktop Action ${actionName}]`
+      for (const [key, value] of Object.entries(config ?? {})) {
+        data += `\n${key}=${value}`
+      }
+      data += "\n"
+    }
     return Promise.resolve(data)
   }
 }
@@ -207,4 +220,5 @@ const macToLinuxCategory: any = {
   "public.app-category.utilities": "Utility",
   "public.app-category.social-networking": "Network;Chat",
   "public.app-category.finance": "Office;Finance",
+  "public.app-category.music": "Audio;AudioVideo",
 }
