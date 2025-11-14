@@ -18,7 +18,7 @@
   "dependencies": {
     "builder-util-runtime": "workspace:*",
     "fs-extra": "^10.1.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "lazy-val": "^1.0.5",
     "lodash.escaperegexp": "^4.1.2",
     "lodash.isequal": "^4.5.0",
